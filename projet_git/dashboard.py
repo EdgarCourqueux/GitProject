@@ -1,3 +1,5 @@
+Dashboard Bitcoin Amélioré
+
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -217,6 +219,21 @@ def update_data_and_graph(n):
         )
         return empty_fig, "N/A"
 
+    # Calculer les variations de prix pour adapter l'échelle du graphique
+    min_price = df["Price"].min()
+    max_price = df["Price"].max()
+    
+    # Ajouter une marge de 1% pour mieux visualiser les variations
+    price_range = max_price - min_price
+    if price_range < 0.01 * min_price:  # Si la plage est très petite
+        # Créer une plage artificielle avec une marge de 0.5%
+        y_min = min_price * 0.995
+        y_max = max_price * 1.005
+    else:
+        # Ajouter une marge de 5% pour mieux voir les variations
+        y_min = min_price - (price_range * 0.05)
+        y_max = max_price + (price_range * 0.05)
+
     # Créer une figure personnalisée
     fig = go.Figure()
     
@@ -231,7 +248,7 @@ def update_data_and_graph(n):
         fillcolor=f'rgba({242}, {169}, {0}, 0.1)'  # Version transparente de la couleur Bitcoin
     ))
     
-    # Mise en forme du graphique
+    # Mise en forme du graphique avec adaptation de l'échelle
     fig.update_layout(
         margin=dict(l=20, r=20, t=30, b=20),
         plot_bgcolor=COLORS["background"],
@@ -246,10 +263,49 @@ def update_data_and_graph(n):
             title="Prix (USD)",
             showgrid=True,
             gridcolor='rgba(200,200,200,0.2)',
-            tickprefix="$"
+            tickprefix="$",
+            range=[y_min, y_max]  # Ajuster l'échelle Y pour mieux voir les variations
         ),
         hovermode="x unified"
     )
+    
+    # Ajouter des annotations pour les points importants
+    if len(df) > 1:
+        # Marquer le prix le plus bas
+        min_price_idx = df["Price"].idxmin()
+        fig.add_trace(go.Scatter(
+            x=[df.iloc[min_price_idx]["Timestamp"]],
+            y=[df.iloc[min_price_idx]["Price"]],
+            mode='markers',
+            marker=dict(color=COLORS["negative"], size=8),
+            hoverinfo='text',
+            hovertext=f'Min: ${df.iloc[min_price_idx]["Price"]:,.2f}',
+            showlegend=False
+        ))
+        
+        # Marquer le prix le plus haut
+        max_price_idx = df["Price"].idxmax()
+        fig.add_trace(go.Scatter(
+            x=[df.iloc[max_price_idx]["Timestamp"]],
+            y=[df.iloc[max_price_idx]["Price"]],
+            mode='markers',
+            marker=dict(color=COLORS["positive"], size=8),
+            hoverinfo='text',
+            hovertext=f'Max: ${df.iloc[max_price_idx]["Price"]:,.2f}',
+            showlegend=False
+        ))
+        
+        # Marquer le prix actuel
+        current_idx = len(df) - 1
+        fig.add_trace(go.Scatter(
+            x=[df.iloc[current_idx]["Timestamp"]],
+            y=[df.iloc[current_idx]["Price"]],
+            mode='markers',
+            marker=dict(color=COLORS["bitcoin"], size=10, symbol="star"),
+            hoverinfo='text',
+            hovertext=f'Actuel: ${df.iloc[current_idx]["Price"]:,.2f}',
+            showlegend=False
+        ))
     
     # Récupérer le prix actuel (dernier prix)
     current_price = f"${df['Price'].iloc[-1]:,.2f}"
