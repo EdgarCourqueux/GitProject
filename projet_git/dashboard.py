@@ -115,7 +115,7 @@ app.layout = html.Div([
     dash.Output("price-graph", "figure"),
     [dash.Input("interval-component", "n_intervals")]
 )
-import subprocess  # Pour exécuter le script Bash
+
 
 def update_graph(n):
     """ Met à jour le graphique en exécutant `scraper.sh` pour récupérer les nouvelles données. """
