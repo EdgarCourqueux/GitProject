@@ -36,7 +36,7 @@ def update_graph(n):
     if not prices:
         return px.line(title="Aucune donnée disponible", template="plotly_dark")
 
-    df = px.data.pandas.DataFrame(prices)
+    df = pd.DataFrame(prices)
     fig = px.line(df, x="Timestamp", y="Price", title="📊 Évolution du prix du Bitcoin", template="plotly_white")
 
     return fig
