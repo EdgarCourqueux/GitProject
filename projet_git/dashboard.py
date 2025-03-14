@@ -4,20 +4,44 @@ import plotly.express as px
 import requests
 import datetime
 import pandas as pd
+import os
 
 app = dash.Dash(__name__)
-prices = []  # Stockage en mémoire
+
+DATA_FILE = "projet.csv"
+prices = []  # Stockage temporaire
+
+def load_data():
+    """ Charge les données du fichier CSV au démarrage. """
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+        return df.to_dict("records")  # Convertir en liste de dictionnaires
+    return []
+
+def save_data():
+    """ Sauvegarde les données dans le fichier CSV. """
+    df = pd.DataFrame(prices)
+    df.to_csv(DATA_FILE, index=False)
 
 def get_bitcoin_price():
-    """ Récupère le prix et l'ajoute à la liste en mémoire. """
+    """ Récupère le prix du Bitcoin et l'ajoute aux données. """
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
     response = requests.get(url).json()
+
+    # Vérification pour éviter les erreurs si l'API ne répond pas
+    if "bitcoin" not in response or "usd" not in response["bitcoin"]:
+        print("❌ Erreur : Impossible de récupérer le prix Bitcoin")
+        return
+
     price = response["bitcoin"]["usd"]
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     prices.append({"Timestamp": timestamp, "Price": price})
     
-    if len(prices) > 50:  # Garde les 50 dernières valeurs
+    if len(prices) > 50:  # Garde seulement les 50 dernières valeurs
         prices.pop(0)
+
+    save_data()  # Sauvegarde après chaque mise à jour
 
     print(f"[{timestamp}] Prix récupéré : {price}")
 
@@ -47,6 +71,9 @@ def get_daily_report():
     🔻 **Min** : {min_price} USD
     📊 **Évolution** : {evolution}%
     """
+
+# Charger les données sauvegardées au démarrage
+prices = load_data()
 
 # ---------------------- DASHBOARD ----------------------
 app.layout = html.Div([
