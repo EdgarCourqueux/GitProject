@@ -33,23 +33,23 @@ dash_app.layout = html.Div([
     [dash.Input("interval-component", "n_intervals")]
 )
 def update_graph(n):
-    get_bitcoin_price()  # Récupérer le dernier prix
-    if not prices:
-        return px.line(title="Aucune donnée disponible", template="plotly_dark")
-
-    df = px.data.pandas.DataFrame(prices)
-    fig = px.line(df, x="Timestamp", y="Price", title="📊 Évolution du prix du Bitcoin", template="plotly_white")
+    df = load_data()  # Charge les données
     
-    fig.update_layout(
-        xaxis_title="Heure",
-        yaxis_title="Prix ($)",
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, zeroline=False),
-        margin=dict(l=40, r=40, t=40, b=40),
-        plot_bgcolor="white"
+    print("=== DEBUG: Données chargées ===")
+    print(df.tail(10))  # Affiche les 10 dernières lignes
+    
+    if df.empty:
+        print("❌ Aucune donnée disponible !")
+        return px.line(title="Aucune donnée disponible", template="plotly_dark")
+    
+    fig = px.line(
+        df, x="Timestamp", y="Price", 
+        title="📊 Évolution du prix du Bitcoin",
+        template="plotly_white"
     )
 
     return fig
+
 
 if __name__ == "__main__":
     dash_app.run_server(debug=False, host="0.0.0.0", port=8050)
