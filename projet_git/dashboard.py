@@ -19,14 +19,15 @@ def load_data():
     if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
         try:
             df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
-            df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+            df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce").astype(str)  # Convertir en string
             df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
             df = df.dropna()  # Supprime les lignes mal formatées
-            return df.to_dict("records")
+            return df.to_dict("records")  # Liste de dictionnaires
         except Exception as e:
             print(f"❌ Erreur lors du chargement des données : {e}")
             return []
     return []
+
 
 
 def save_data():
@@ -39,6 +40,10 @@ def get_bitcoin_price():
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
     response = requests.get(url).json()
     
+    if "bitcoin" not in response or "usd" not in response["bitcoin"]:
+        print("⚠️ Erreur : Impossible de récupérer les données de l'API")
+        return
+
     price = response["bitcoin"]["usd"]
     
     # Convertir en heure locale
@@ -49,7 +54,9 @@ def get_bitcoin_price():
     if len(prices) > 50:  # Garde les 50 dernières valeurs
         prices.pop(0)
 
+    save_data()  # Sauvegarde après chaque mise à jour
     print(f"[{timestamp}] Prix récupéré : {price}")
+
 
 def get_daily_report():
     """ Génère un rapport quotidien basé sur les prix stockés. """
