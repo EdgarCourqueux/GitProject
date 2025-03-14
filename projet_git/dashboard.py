@@ -113,15 +113,24 @@ app.layout = html.Div([
     dash.Output("price-graph", "figure"),
     [dash.Input("interval-component", "n_intervals")]
 )
+import subprocess  # Pour exécuter le script Bash
+
 def update_graph(n):
-    get_bitcoin_price()  # Récupère un nouveau prix
+    """ Met à jour le graphique en exécutant `scraper.sh` pour récupérer les nouvelles données. """
     
-    if not prices:
+    # Exécuter `scraper.sh` pour récupérer de nouvelles données
+    subprocess.run(["bash", "scraper.sh"], check=True)
+
+    # Charger les nouvelles données depuis le fichier CSV
+    df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce").astype(str)  # Convertir en string
+    df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+    df = df.dropna()  # Supprime les lignes mal formatées
+
+    if df.empty:
         return px.line(title="Aucune donnée disponible", template="plotly_dark")
 
-    df = pd.DataFrame(prices)
     fig = px.line(df, x="Timestamp", y="Price", title="📊 Évolution du prix du Bitcoin", template="plotly_white")
-
     return fig
 
 # Mise à jour du rapport quotidien
