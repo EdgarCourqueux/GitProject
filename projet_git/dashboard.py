@@ -12,6 +12,12 @@ def get_bitcoin_price():
     """ Récupère le prix et l'ajoute à la liste en mémoire. """
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
     response = requests.get(url).json()
+
+    # Vérification de la réponse avant de l'utiliser
+    if "bitcoin" not in response or "usd" not in response["bitcoin"]:
+        print("❌ Erreur : Impossible de récupérer le prix Bitcoin")
+        return  # Sortir sans ajouter de valeur
+
     price = response["bitcoin"]["usd"]
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     prices.append({"Timestamp": timestamp, "Price": price})
@@ -20,6 +26,7 @@ def get_bitcoin_price():
         prices.pop(0)
 
     print(f"[{timestamp}] Prix récupéré : {price}")
+
 
 def get_daily_report():
     """ Génère un rapport quotidien basé sur les prix stockés. """
