@@ -8,7 +8,7 @@ DATA_FILE="/home/edgar/projet_git/projet.csv"
 LOG_FILE="/home/edgar/projet_git/cron_debug.log"
 
 # Récupérer les données JSON de l'API
-PRICE=$(curl -s "$URL" | jq -r '.bitcoin.usd')
+PRICE=$(curl -s "$URL" | grep -oP '(?<="usd":)[0-9.]+')
 
 # Vérifier si le prix est valide (éviter d'écrire une ligne vide)
 if [[ -z "$PRICE" || "$PRICE" == "null" ]]; then
