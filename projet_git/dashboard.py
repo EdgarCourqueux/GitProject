@@ -5,7 +5,9 @@ import requests
 import datetime
 import pandas as pd
 import os
-import pytz 
+import pytz
+import subprocess  # ✅ Ajouté en haut avec les autres imports
+
 
 app = dash.Dash(__name__)
 
