@@ -39,16 +39,19 @@ def load_data():
             df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
             df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
             df = df.dropna()  # Supprime les lignes mal formatées
-            return df.to_dict("records")
+            return df
         except Exception as e:
             print(f"❌ Erreur lors du chargement des données : {e}")
-            return []
-    return []
+            return pd.DataFrame(columns=["Timestamp", "Price"])
+    return pd.DataFrame(columns=["Timestamp", "Price"])
 
-def save_data(prices_data):
-    """Sauvegarde les données dans le fichier CSV."""
-    df = pd.DataFrame(prices_data)
-    df.to_csv(DATA_FILE, index=False, header=False)
+def save_data(df):
+    """Sauvegarde les données DataFrame dans le fichier CSV."""
+    try:
+        df.to_csv(DATA_FILE, index=False, header=False)
+        print(f"✅ Données sauvegardées dans {DATA_FILE}")
+    except Exception as e:
+        print(f"❌ Erreur lors de la sauvegarde des données : {e}")
 
 def get_bitcoin_price():
     """Récupère le prix du Bitcoin via l'API CoinGecko."""
@@ -58,45 +61,33 @@ def get_bitcoin_price():
         
         if "bitcoin" not in response or "usd" not in response["bitcoin"]:
             print("⚠️ Erreur : Impossible de récupérer les données de l'API")
-            return None
+            return None, None
 
         price = response["bitcoin"]["usd"]
         timestamp = datetime.datetime.now(pytz.utc).astimezone(TZ_PARIS)
         
-        return {"Timestamp": timestamp, "Price": price}
+        return timestamp, price
     except Exception as e:
         print(f"❌ Erreur lors de la récupération du prix : {e}")
-        return None
+        return None, None
 
-def update_prices_data(prices_data):
-    """Met à jour les données de prix et maintient la taille de la liste."""
-    new_price_data = get_bitcoin_price()
-    if new_price_data:
-        prices_data.append(new_price_data)
-        
-        # Garder seulement les MAX_DATA_POINTS dernières valeurs
-        if len(prices_data) > MAX_DATA_POINTS:
-            prices_data = prices_data[-MAX_DATA_POINTS:]
-            
-        save_data(prices_data)
-        print(f"[{new_price_data['Timestamp']}] Prix récupéré : {new_price_data['Price']}")
-    
-    return prices_data
-
-def get_daily_report(prices_data):
-    """Génère un rapport quotidien basé sur les prix stockés."""
-    if not prices_data:
+def get_daily_report(df):
+    """Génère un rapport quotidien basé sur les dataframe."""
+    if df.empty:
         return html.Div("Aucune donnée disponible pour aujourd'hui.")
 
-    df = pd.DataFrame(prices_data)
+    # Assurez-vous que Timestamp est un datetime
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+    
     today = datetime.datetime.now(TZ_PARIS).date()
-    df_today = df[pd.to_datetime(df["Timestamp"]).dt.date == today]
+    df_today = df[df["Timestamp"].dt.date == today]
 
     if df_today.empty:
         return html.Div("Aucune donnée disponible pour aujourd'hui.")
 
+    # Utilisation du dernier prix connu issu du script scraper.sh
     open_price = df_today.iloc[0]["Price"]
-    close_price = df_today.iloc[-1]["Price"]
+    close_price = df_today.iloc[-1]["Price"]  # Dernière valeur du DataFrame
     max_price = df_today["Price"].max()
     min_price = df_today["Price"].min()
     evolution = round(((close_price - open_price) / open_price) * 100, 2)
@@ -133,8 +124,8 @@ def get_daily_report(prices_data):
         ], className="stat-item"),
     ], className="stats-container")
 
-# Charger les données sauvegardées au démarrage
-prices = load_data()
+# Variable globale pour stocker le DataFrame des prix
+df_prices = load_data()
 
 # ---------------------- DASHBOARD LAYOUT ----------------------
 app.layout = html.Div([
@@ -172,7 +163,6 @@ app.layout = html.Div([
     
     # Intervalles de mise à jour
     dcc.Interval(id="interval-component", interval=60000, n_intervals=0),  # 1 minute
-    dcc.Interval(id="interval-report", interval=60000, n_intervals=0),    # 1 minute
     
     # CSS personnalisé
     html.Link(
@@ -180,6 +170,8 @@ app.layout = html.Div([
         href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
     ),
     
+    # Store pour garder la dernière valeur correcte
+    dcc.Store(id='last-valid-data')
 ], id="dashboard-container")
 
 # ---------------------- CALLBACKS ----------------------
@@ -187,26 +179,25 @@ app.layout = html.Div([
 @app.callback(
     Output("price-graph", "figure"),
     Output("current-price", "children"),
+    Output("daily-report", "children"),
     Input("interval-component", "n_intervals")
 )
-def update_data_and_graph(n):
-    """Met à jour les données et le graphique."""
-    global prices
+def update_dashboard(n):
+    """Met à jour les données et le dashboard complet."""
+    global df_prices
     
     # Exécuter scraper.sh pour récupérer de nouvelles données
     try:
         subprocess.run(["bash", "scraper.sh"], check=True)
+        print("✅ Script scraper.sh exécuté avec succès")
     except Exception as e:
         print(f"❌ Erreur lors de l'exécution du script : {e}")
     
     # Charger les nouvelles données depuis le fichier CSV
-    prices = load_data()
-    
-    # Créer un DataFrame pour le graphique
-    df = pd.DataFrame(prices)
+    df_prices = load_data()
     
     # Vérifier si des données sont disponibles
-    if df.empty:
+    if df_prices.empty:
         empty_fig = go.Figure()
         empty_fig.update_layout(
             title="Aucune donnée disponible",
@@ -215,20 +206,33 @@ def update_data_and_graph(n):
             paper_bgcolor=COLORS["background"],
             font=dict(color=COLORS["text"])
         )
-        return empty_fig, "N/A"
+        return empty_fig, "N/A", html.Div("Aucune donnée disponible")
+
+    # Récupérer le prix actuel directement de l'API pour s'assurer d'avoir la dernière valeur
+    timestamp, latest_price = get_bitcoin_price()
+    
+    if latest_price is not None and timestamp is not None:
+        # Si on a réussi à récupérer un nouveau prix de l'API, on l'ajoute au DataFrame
+        # mais on ne l'ajoute pas au CSV pour éviter les doublons avec le script scraper.sh
+        # On l'utilise uniquement pour l'affichage
+        current_price = f"${latest_price:,.2f}"
+    else:
+        # Si on n'a pas pu récupérer de prix de l'API, on utilise le dernier prix du DataFrame
+        latest_price = df_prices["Price"].iloc[-1]
+        current_price = f"${latest_price:,.2f}"
 
     # Calculer les variations de prix pour adapter l'échelle du graphique
-    min_price = df["Price"].min()
-    max_price = df["Price"].max()
+    min_price = df_prices["Price"].min()
+    max_price = df_prices["Price"].max()
     
-    # Ajouter une marge de 1% pour mieux visualiser les variations
+    # Ajouter une marge pour mieux visualiser les variations
     price_range = max_price - min_price
     if price_range < 0.01 * min_price:  # Si la plage est très petite
         # Créer une plage artificielle avec une marge de 0.5%
         y_min = min_price * 0.995
         y_max = max_price * 1.005
     else:
-        # Ajouter une marge de 5% pour mieux voir les variations
+        # Ajouter une marge de 2% pour mieux voir les variations
         y_min = min_price - (price_range * 0.05)
         y_max = max_price + (price_range * 0.05)
 
@@ -237,8 +241,8 @@ def update_data_and_graph(n):
     
     # Ajouter la ligne principale
     fig.add_trace(go.Scatter(
-        x=df["Timestamp"],
-        y=df["Price"],
+        x=df_prices["Timestamp"],
+        y=df_prices["Price"],
         mode='lines',
         name='Prix BTC',
         line=dict(color=COLORS["bitcoin"], width=3),
@@ -267,56 +271,56 @@ def update_data_and_graph(n):
         hovermode="x unified"
     )
     
-    # Ajouter des annotations pour les points importants
-    if len(df) > 1:
+    # Ajouter des annotations pour les prix importants
+    if len(df_prices) > 1:
         # Marquer le prix le plus bas
-        min_price_idx = df["Price"].idxmin()
+        min_price_idx = df_prices["Price"].idxmin()
         fig.add_trace(go.Scatter(
-            x=[df.iloc[min_price_idx]["Timestamp"]],
-            y=[df.iloc[min_price_idx]["Price"]],
+            x=[df_prices.iloc[min_price_idx]["Timestamp"]],
+            y=[df_prices.iloc[min_price_idx]["Price"]],
             mode='markers',
             marker=dict(color=COLORS["negative"], size=8),
             hoverinfo='text',
-            hovertext=f'Min: ${df.iloc[min_price_idx]["Price"]:,.2f}',
+            hovertext=f'Min: ${df_prices.iloc[min_price_idx]["Price"]:,.2f}',
             showlegend=False
         ))
         
         # Marquer le prix le plus haut
-        max_price_idx = df["Price"].idxmax()
+        max_price_idx = df_prices["Price"].idxmax()
         fig.add_trace(go.Scatter(
-            x=[df.iloc[max_price_idx]["Timestamp"]],
-            y=[df.iloc[max_price_idx]["Price"]],
+            x=[df_prices.iloc[max_price_idx]["Timestamp"]],
+            y=[df_prices.iloc[max_price_idx]["Price"]],
             mode='markers',
             marker=dict(color=COLORS["positive"], size=8),
             hoverinfo='text',
-            hovertext=f'Max: ${df.iloc[max_price_idx]["Price"]:,.2f}',
+            hovertext=f'Max: ${df_prices.iloc[max_price_idx]["Price"]:,.2f}',
             showlegend=False
         ))
         
-        # Marquer le prix actuel
-        current_idx = len(df) - 1
+        # Marquer le prix actuel avec une étoile
         fig.add_trace(go.Scatter(
-            x=[df.iloc[current_idx]["Timestamp"]],
-            y=[df.iloc[current_idx]["Price"]],
+            x=[df_prices.iloc[-1]["Timestamp"] if timestamp is None else timestamp],
+            y=[df_prices.iloc[-1]["Price"] if latest_price is None else latest_price],
             mode='markers',
             marker=dict(color=COLORS["bitcoin"], size=10, symbol="star"),
             hoverinfo='text',
-            hovertext=f'Actuel: ${df.iloc[current_idx]["Price"]:,.2f}',
+            hovertext=f'Actuel: ${latest_price if latest_price is not None else df_prices.iloc[-1]["Price"]:,.2f}',
             showlegend=False
         ))
     
-    # Récupérer le prix actuel (dernier prix)
-    current_price = f"${df['Price'].iloc[-1]:,.2f}"
-    
-    return fig, current_price
+    # Si on a récupéré un nouveau prix de l'API, on l'ajoute temporairement au DataFrame
+    # pour le rapport quotidien
+    temp_df = df_prices.copy()
+    if timestamp is not None and latest_price is not None:
+        temp_df = pd.concat([
+            temp_df, 
+            pd.DataFrame({"Timestamp": [timestamp], "Price": [latest_price]})
+        ]).reset_index(drop=True)
 
-@app.callback(
-    Output("daily-report", "children"),
-    Input("interval-report", "n_intervals")
-)
-def update_report(n):
-    """Met à jour le rapport quotidien."""
-    return get_daily_report(prices)
+    # Générer le rapport avec les données les plus récentes
+    daily_report = get_daily_report(temp_df)
+    
+    return fig, current_price, daily_report
 
 # -------------------- STYLES CSS --------------------
 app.index_string = """
