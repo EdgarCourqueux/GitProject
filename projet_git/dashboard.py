@@ -12,12 +12,19 @@ DATA_FILE = "projet.csv"
 prices = []  # Stockage temporaire
 
 def load_data():
-    """ Charge les données du fichier CSV au démarrage. """
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
-        df["Timestamp"] = pd.to_datetime(df["Timestamp"])
-        return df.to_dict("records")  # Convertir en liste de dictionnaires
+    """ Charge les données du fichier CSV au démarrage en gérant les erreurs. """
+    if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 0:
+        try:
+            df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
+            df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+            df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+            df = df.dropna()  # Supprime les lignes mal formatées
+            return df.to_dict("records")
+        except Exception as e:
+            print(f"❌ Erreur lors du chargement des données : {e}")
+            return []
     return []
+
 
 def save_data():
     """ Sauvegarde les données dans le fichier CSV. """
