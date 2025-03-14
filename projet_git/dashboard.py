@@ -3,6 +3,7 @@ from dash import dcc, html
 import plotly.express as px
 import requests
 import datetime
+import pandas as pd
 
 app = dash.Dash(__name__)
 prices = []  # Stockage en mémoire
