@@ -4,8 +4,8 @@
 URL="https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
 
 # Fichier de stockage des données
-DATA_FILE="/home/edgar/projet_git/projet.csv"
-LOG_FILE="/home/edgar/projet_git/cron_debug.log"
+DATA_FILE="projet.csv"
+LOG_FILE="cron_debug.log"
 
 # Récupérer les données JSON de l'API
 PRICE=$(curl -s "$URL" | grep -oP '(?<="usd":)[0-9.]+')
