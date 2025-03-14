@@ -5,11 +5,14 @@ import requests
 import datetime
 import pandas as pd
 import os
+import pytz 
 
 app = dash.Dash(__name__)
 
 DATA_FILE = "projet.csv"
 prices = []  # Stockage temporaire
+# Définir le fuseau horaire correct (Paris)
+TZ_PARIS = pytz.timezone("Europe/Paris")
 
 def load_data():
     """ Charge les données du fichier CSV au démarrage en gérant les erreurs. """
@@ -32,23 +35,19 @@ def save_data():
     df.to_csv(DATA_FILE, index=False)
 
 def get_bitcoin_price():
-    """ Récupère le prix du Bitcoin et l'ajoute aux données. """
+    """ Récupère le prix et l'ajoute à la liste en mémoire avec la bonne heure. """
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
     response = requests.get(url).json()
-
-    # Vérification pour éviter les erreurs si l'API ne répond pas
-    if "bitcoin" not in response or "usd" not in response["bitcoin"]:
-        print("❌ Erreur : Impossible de récupérer le prix Bitcoin")
-        return
-
-    price = response["bitcoin"]["usd"]
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    prices.append({"Timestamp": timestamp, "Price": price})
     
-    if len(prices) > 50:  # Garde seulement les 50 dernières valeurs
-        prices.pop(0)
+    price = response["bitcoin"]["usd"]
+    
+    # Convertir en heure locale
+    timestamp = datetime.datetime.now(pytz.utc).astimezone(TZ_PARIS).strftime("%Y-%m-%d %H:%M:%S")
+    
+    prices.append({"Timestamp": timestamp, "Price": price})
 
-    save_data()  # Sauvegarde après chaque mise à jour
+    if len(prices) > 50:  # Garde les 50 dernières valeurs
+        prices.pop(0)
 
     print(f"[{timestamp}] Prix récupéré : {price}")
 
