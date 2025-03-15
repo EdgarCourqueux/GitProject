@@ -19,6 +19,8 @@ fi
 # Ajouter un horodatage et sauvegarder les données
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 echo "$TIMESTAMP,$PRICE" >> "$DATA_FILE"
+echo "🔍 Contenu actuel de projet.csv :"
+cat "$DATA_FILE"
 
 # Afficher les données pour le débogage
 echo "[$TIMESTAMP] ✅ Prix récupéré : $PRICE"
