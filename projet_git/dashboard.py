@@ -90,6 +90,8 @@ def get_daily_report(prices_data):
     df = pd.DataFrame(prices_data)
     today = datetime.datetime.now(TZ_PARIS).date()
     df_today = df[pd.to_datetime(df["Timestamp"]).dt.date == today]
+    current_idx = len(df) - 1
+    PrixActuel=df.iloc[current_idx]["Price"]
 
     if df_today.empty:
         return html.Div("Aucune donnée disponible pour aujourd'hui.")
@@ -114,7 +116,7 @@ def get_daily_report(prices_data):
         ], className="stat-item"),
         html.Div([
             html.Div("Dernière valeur", className="stat-label"),
-            html.Div(f"${close_price:,.2f}", className="stat-value")
+            html.Div(f"${PrixActuel:,.2f}", className="stat-value")
         ], className="stat-item"),
         html.Div([
             html.Div("Maximum", className="stat-label"),
