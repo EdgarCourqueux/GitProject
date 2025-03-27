@@ -46,12 +46,17 @@ def load_data():
     try:
         df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+        
+        # Appliquer le décalage UTC+1 (Europe/Paris)
+        df["Timestamp"] = df["Timestamp"].dt.tz_localize("UTC").dt.tz_convert("Europe/Paris")
+        
         df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
         df = df.dropna().sort_values("Timestamp")
         return df.tail(MAX_DATA_POINTS)
     except Exception as e:
         print(f"❌ Data loading error: {e}")
         return pd.DataFrame(columns=["Timestamp", "Price"])
+
 
 def load_daily_report():
     """Load the daily report from the CSV file with precise timestamp."""
