@@ -8,6 +8,36 @@ import datetime
 import pytz
 import os
 import numpy as np
+# Application Initialization
+app = dash.Dash(
+    __name__,
+    meta_tags=[
+        {"name": "viewport", "content": "width=device-width, initial-scale=1"},
+        {"name": "theme-color", "content": "#3498db"}
+    ],
+    external_stylesheets=[
+        'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap'
+    ]
+)
+server = app.server
+
+# Configuration Constants
+BASE_PATH = "/app"
+DATA_FILE = os.path.join(BASE_PATH, "projet.csv")
+REPORT_FILE = os.path.join(BASE_PATH, "daily_report.csv")
+TZ_PARIS = pytz.timezone("Europe/Paris")
+MAX_DATA_POINTS = 200  # Increased for more detailed view
+
+# Design Theme
+COLORS = {
+    "background": "#f4f6f9",
+    "text": "#2c3e50",
+    "bitcoin": "#f2a900",
+    "positive": "#2ecc71",
+    "negative": "#e74c3c",
+    "card_bg": "#ffffff",
+    "grid": "#ecf0f1"
+}
 app.layout = html.Div([
     html.Head(
         html.Link(
@@ -136,36 +166,6 @@ app.layout = html.Div([
     dcc.Interval(id="report-update", interval=3600000)
 ], className="dashboard-container")
 
-# Application Initialization
-app = dash.Dash(
-    __name__,
-    meta_tags=[
-        {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        {"name": "theme-color", "content": "#3498db"}
-    ],
-    external_stylesheets=[
-        'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap'
-    ]
-)
-server = app.server
-
-# Configuration Constants
-BASE_PATH = "/app"
-DATA_FILE = os.path.join(BASE_PATH, "projet.csv")
-REPORT_FILE = os.path.join(BASE_PATH, "daily_report.csv")
-TZ_PARIS = pytz.timezone("Europe/Paris")
-MAX_DATA_POINTS = 200  # Increased for more detailed view
-
-# Design Theme
-COLORS = {
-    "background": "#f4f6f9",
-    "text": "#2c3e50",
-    "bitcoin": "#f2a900",
-    "positive": "#2ecc71",
-    "negative": "#e74c3c",
-    "card_bg": "#ffffff",
-    "grid": "#ecf0f1"
-}
 
 def ensure_files_exist():
     """Ensure required files exist with proper permissions."""
