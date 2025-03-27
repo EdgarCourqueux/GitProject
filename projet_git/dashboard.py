@@ -80,7 +80,36 @@ def load_data():
     except Exception as e:
         print(f"❌ Data loading error: {e}")
         return pd.DataFrame(columns=["Timestamp", "Price"])
+# Dashboard Layout
+def create_dashboard_layout():
+    return html.Div([
+        html.Div([
+            html.H1("Bitcoin Live Monitor", className="dashboard-title"),
+            html.Div(id="current-price", className="current-price")
+        ], className="dashboard-header"),
+        
+        html.Div([
+            html.Div([
+                dcc.Graph(id="price-graph", config={'displayModeBar': False})
+            ], className="graph-container"),
+            
+            html.Div([
+                html.Div(id="daily-report", className="report-container")
+            ])
+        ], className="content-wrapper")
+    ], className="dashboard-container")
 
+app.layout = html.Div([
+    create_dashboard_layout(),
+    dcc.Interval(id="graph-update", interval=60000),
+    dcc.Interval(id="report-update", interval=3600000)
+])
+
+@app.callback(
+    Output("price-graph", "figure"),
+    Output("current-price", "children"),
+    Input("graph-update", "n_intervals")
+)
 def load_daily_report():
     """Enhanced daily report loading with real-time calculations."""
     try:
