@@ -248,9 +248,11 @@ app.index_string = """
                 line-height: 1.6;
             }
             .dashboard-container {
-                max-width: 1400px;
-                margin: 0 auto;
-                padding: 30px;
+                max-width: 100%;  /* Assurez-vous que le conteneur ne dépasse pas 100% de la largeur de l'écran */
+                width: 100%;      /* Force le conteneur à s'adapter à la largeur de l'écran */
+                margin: 0 auto;   /* Centrer le conteneur */
+                padding: 30px;    /* Conservez un padding pour un peu d'espace autour du contenu */
+                box-sizing: border-box; /* Inclut padding et border dans la largeur et hauteur totale */
             }
             .dashboard-title {
                 color: #F7931A;
