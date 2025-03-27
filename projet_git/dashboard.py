@@ -53,17 +53,17 @@ def load_data():
         return pd.DataFrame(columns=["Timestamp", "Price"])
 
 def load_daily_report():
-    """Load the daily report from the CSV file."""
+    """Load the daily report from the CSV file with precise timestamp."""
     try:
-        cols = ["Date", "Open", "Close", "Max", "Min", "Evolution"]
+        cols = ["Timestamp", "Open", "Close", "Max", "Min", "Evolution"]
         df = pd.read_csv(REPORT_FILE, names=cols, header=None)
-        df["Date"] = pd.to_datetime(df["Date"])
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"])
         
         # If no data, return a default/empty report
         if df.empty:
-            today = datetime.date.today()
+            now = datetime.datetime.now()
             return pd.Series({
-                "Date": today,
+                "Timestamp": now,
                 "Open": 0,
                 "Close": 0,
                 "Max": 0,
@@ -75,6 +75,12 @@ def load_daily_report():
     except Exception as e:
         print(f"❌ Report loading error: {e}")
         return None
+
+@app.callback(
+    Output("daily-report", "children"),
+    [Input("graph-update", "n_intervals"),  # Trigger on each graph update
+     Input("price-graph", "figure")]  # Ensure update on data change
+)
 
 def create_price_graph(df):
     """Create a responsive and visually appealing price graph."""
@@ -168,9 +174,10 @@ def update_graph_and_price(n):
     Output("daily-report", "children"),
     Input("report-update", "n_intervals")
 )
-def update_daily_report(n):
-    """Update daily report section."""
+def update_daily_report(n, figure):
+    """Update daily report section with each graph update."""
     try:
+        # Run the daily report script to regenerate the report
         subprocess.run(["/bin/bash", "/app/daily_report.sh"], check=True)
     except Exception as e:
         print(f"❌ Daily report script error: {e}")
@@ -184,8 +191,8 @@ def update_daily_report(n):
         html.H3("Daily Bitcoin Report", className="report-title"),
         html.Div([
             html.Div([
-                html.Span("Date", className="report-label"),
-                html.Span(report["Date"].strftime("%Y-%m-%d"), className="report-value")
+                html.Span("Timestamp", className="report-label"),
+                html.Span(report["Timestamp"].strftime("%Y-%m-%d %H:%M:%S"), className="report-value")
             ], className="report-item"),
             html.Div([
                 html.Span("Open Price", className="report-label"),
