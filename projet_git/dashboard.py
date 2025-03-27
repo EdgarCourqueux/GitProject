@@ -77,9 +77,10 @@ def load_daily_report():
         return None
 
 @app.callback(
-    Output("daily-report", "children"),
-    [Input("graph-update", "n_intervals"),  # Trigger on each graph update
-     Input("price-graph", "figure")]  # Ensure update on data change
+    [Output("price-graph", "figure"),
+     Output("current-price", "children"),
+     Output("daily-report", "children")],  # Combined outputs
+    [Input("graph-update", "n_intervals")]
 )
 
 def create_price_graph(df):
