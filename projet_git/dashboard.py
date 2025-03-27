@@ -76,13 +76,6 @@ def load_daily_report():
         print(f"❌ Report loading error: {e}")
         return None
 
-@app.callback(
-    [Output("price-graph", "figure"),
-     Output("current-price", "children"),
-     Output("daily-report", "children")],  # Combined outputs
-    [Input("graph-update", "n_intervals")]
-)
-
 def create_price_graph(df):
     """Create a responsive and visually appealing price graph."""
     if df.empty:
@@ -124,8 +117,8 @@ def create_price_graph(df):
     
     return fig
 
-# Dashboard Layout (unchanged from previous version)
 def create_dashboard_layout():
+    """Create the dashboard layout."""
     return html.Div([
         html.Div([
             html.H1("Bitcoin Live Monitor", className="dashboard-title"),
@@ -143,87 +136,78 @@ def create_dashboard_layout():
         ], className="content-wrapper")
     ], className="dashboard-container")
 
-app.layout = html.Div([
-    create_dashboard_layout(),
-    dcc.Interval(id="graph-update", interval=60000),
-    dcc.Interval(id="report-update", interval=3600000)
-])
-
+# Single callback to update all components
 @app.callback(
-    Output("price-graph", "figure"),
-    Output("current-price", "children"),
-    Input("graph-update", "n_intervals")
+    [Output("price-graph", "figure"),
+     Output("current-price", "children"),
+     Output("daily-report", "children")],
+    [Input("interval-component", "n_intervals")]
 )
-def update_graph_and_price(n):
-    """Update graph and current price."""
+def update_dashboard(n):
+    """Comprehensive dashboard update function."""
     try:
+        # Run scraper and daily report scripts
         subprocess.run(["/bin/bash", "/app/scraper.sh"], check=True)
+        subprocess.run(["/bin/bash", "/app/daily_report.sh"], check=True)
     except Exception as e:
-        print(f"❌ Scraper script error: {e}")
+        print(f"❌ Script execution error: {e}")
     
+    # Load data for graph
     df = load_data()
     
     if df.empty:
-        return go.Figure(), "N/A"
+        return go.Figure(), "N/A", html.Div("No data available")
     
+    # Create price graph
     fig = create_price_graph(df)
     current_price = f"${df['Price'].iloc[-1]:,.2f}"
     
-    return fig, current_price
-
-@app.callback(
-    Output("daily-report", "children"),
-    Input("report-update", "n_intervals")
-)
-def update_daily_report(n, figure):
-    """Update daily report section with each graph update."""
-    try:
-        # Run the daily report script to regenerate the report
-        subprocess.run(["/bin/bash", "/app/daily_report.sh"], check=True)
-    except Exception as e:
-        print(f"❌ Daily report script error: {e}")
-    
+    # Load daily report
     report = load_daily_report()
     
     if report is None:
-        return html.Div("No report available")
+        daily_report_html = html.Div("No report available")
+    else:
+        daily_report_html = html.Div([
+            html.H3("Daily Bitcoin Report", className="report-title"),
+            html.Div([
+                html.Div([
+                    html.Span("Timestamp", className="report-label"),
+                    html.Span(report["Timestamp"].strftime("%Y-%m-%d %H:%M:%S"), className="report-value")
+                ], className="report-item"),
+                html.Div([
+                    html.Span("Open Price", className="report-label"),
+                    html.Span(f"${report['Open']:,.2f}", className="report-value")
+                ], className="report-item"),
+                html.Div([
+                    html.Span("Close Price", className="report-label"),
+                    html.Span(f"${report['Close']:,.2f}", className="report-value")
+                ], className="report-item"),
+                html.Div([
+                    html.Span("Maximum", className="report-label"),
+                    html.Span(f"${report['Max']:,.2f}", className="report-value")
+                ], className="report-item"),
+                html.Div([
+                    html.Span("Minimum", className="report-label"),
+                    html.Span(f"${report['Min']:,.2f}", className="report-value")
+                ], className="report-item"),
+                html.Div([
+                    html.Span("Evolution", className="report-label"),
+                    html.Span(str(report["Evolution"]), 
+                              className="report-value", 
+                              style={"color": COLORS["positive"] if float(str(report["Evolution"]).rstrip('%')) >= 0 else COLORS["negative"]})
+                ], className="report-item")
+            ], className="report-grid")
+        ], className="report-container")
     
-    return html.Div([
-        html.H3("Daily Bitcoin Report", className="report-title"),
-        html.Div([
-            html.Div([
-                html.Span("Timestamp", className="report-label"),
-                html.Span(report["Timestamp"].strftime("%Y-%m-%d %H:%M:%S"), className="report-value")
-            ], className="report-item"),
-            html.Div([
-                html.Span("Open Price", className="report-label"),
-                html.Span(f"${report['Open']:,.2f}", className="report-value")
-            ], className="report-item"),
-            html.Div([
-                html.Span("Close Price", className="report-label"),
-                html.Span(f"${report['Close']:,.2f}", className="report-value")
-            ], className="report-item"),
-            html.Div([
-                html.Span("Maximum", className="report-label"),
-                html.Span(f"${report['Max']:,.2f}", className="report-value")
-            ], className="report-item"),
-            html.Div([
-                html.Span("Minimum", className="report-label"),
-                html.Span(f"${report['Min']:,.2f}", className="report-value")
-            ], className="report-item"),
-            html.Div([
-                html.Span("Evolution", className="report-label"),
-                html.Span(str(report["Evolution"]), 
-                          className="report-value", 
-                          style={"color": COLORS["positive"] if float(str(report["Evolution"]).rstrip('%')) >= 0 else COLORS["negative"]})
-            ], className="report-item")
-        ], className="report-grid")
-    ], className="report-container")
+    return fig, current_price, daily_report_html
 
-# Rest of the CSS remains the same as in previous version
+# Application Layout
+app.layout = html.Div([
+    create_dashboard_layout(),
+    dcc.Interval(id="interval-component", interval=60000)  # Update every 60 seconds
+])
 
-# Ensure files exist before running
-ensure_files_exist()
 
 # Custom Index String with Dark Mode Styling
 app.index_string = """
