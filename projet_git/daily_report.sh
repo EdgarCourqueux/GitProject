@@ -39,7 +39,8 @@ fi
 
 # Calcul de la volatilité (écart-type des prix)
 PRICES=$(cut -d',' -f2 temp_data.csv)
-VOLATILITY=$(echo "$PRICES" | awk '{sum+=$1; sumsq+=$1*$1} END {print sqrt(sumsq/NR - (sum/NR)**2)}')
+echo "Prices: $PRICES"   # Affichage des prix pour déboguer
+VOLATILITY=$(echo "$PRICES" | tr ',' '\n' | awk '{sum+=$1; sumsq+=$1*$1} END {print sqrt(sumsq/NR - (sum/NR)**2)}')
 
 # Vérifier si les calculs sont valides
 if [[ -z "$OPEN" || -z "$CLOSE" || -z "$MAX" || -z "$MIN" || -z "$VOLATILITY" ]]; then
