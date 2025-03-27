@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Définir les chemins absolus pour le conteneur
 DATA_FILE="/app/projet.csv"
 REPORT_FILE="/app/daily_report.csv"
@@ -27,6 +26,13 @@ MIN=$(cut -d',' -f2 temp_data.csv | sort -n | head -n1)
 
 # Calcul de la variation en pourcentage
 EVOLUTION=$(awk "BEGIN {print (($CLOSE - $OPEN) / $OPEN) * 100}")
+
+# Vérifier si les calculs sont valides
+if [[ -z "$OPEN" || -z "$CLOSE" || -z "$MAX" || -z "$MIN" ]]; then
+    echo "[$(date)] ❌ Calculs invalides !" >> "$LOG_FILE"
+    rm temp_data.csv
+    exit 1
+fi
 
 # Écrire dans le fichier rapport
 echo "$TODAY,$OPEN,$CLOSE,$MAX,$MIN,${EVOLUTION}%" > "$REPORT_FILE"
