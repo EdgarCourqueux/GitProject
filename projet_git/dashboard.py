@@ -23,10 +23,6 @@ app = dash.Dash(
 server = app.server
 
 app.layout = html.Div([
-    dcc.Meta(
-        name='viewport', 
-        content='width=device-width, initial-scale=1'
-    ),
     html.Style('''
         :root {
             --bg-primary: #f4f6f9;
@@ -149,6 +145,7 @@ app.layout = html.Div([
 ], className="dashboard-container")
 
 # Continue with the rest of your app's setup...
+
 
 
 
