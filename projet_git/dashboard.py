@@ -34,6 +34,20 @@ COLORS = {
     "grid": "#ecf0f1"
 }
 
+def ensure_files_exist():
+    """Ensure required files exist with proper permissions."""
+    for file_path in [DATA_FILE, REPORT_FILE]:
+        try:
+            # Create the file if it doesn't exist
+            if not os.path.exists(file_path):
+                open(file_path, 'a').close()
+                print(f"Created file: {file_path}")
+            
+            # Ensure the file is writable
+            os.chmod(file_path, 0o666)
+        except Exception as e:
+            print(f"Error ensuring file {file_path} exists: {e}")
+
 def load_data():
     """Load data from CSV file with improved error handling and filtering."""
     try:
@@ -153,7 +167,7 @@ def create_price_graph(df):
     
     return fig
 
-# Dashboard Layout (unchanged from previous version)
+# Dashboard Layout
 def create_dashboard_layout():
     return html.Div([
         html.Div([
@@ -247,8 +261,6 @@ def update_daily_report(n):
             ], className="report-item")
         ], className="report-grid")
     ], className="report-container")
-
-# Rest of the CSS remains the same as in previous version
 
 # Ensure files exist before running
 ensure_files_exist()
