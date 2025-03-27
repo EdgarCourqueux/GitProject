@@ -5,16 +5,31 @@ import plotly.graph_objects as go
 import pandas as pd
 import subprocess
 import datetime
-import pytz
 import os
 import numpy as np
+
+# Constants and Configuration
+DATA_FILE = "/app/bitcoin_prices.csv"
+REPORT_FILE = "/app/daily_reports.csv"
+MAX_DATA_POINTS = 100
+
+# Color Palette
+COLORS = {
+    "background": "#1C1C1E",
+    "primary": "#F7931A",  # Bitcoin Orange
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#B0B0B0",
+    "grid": "#2C2C2E",
+    "positive": "#4CAF50",
+    "negative": "#F44336"
+}
 
 # Application Initialization
 app = dash.Dash(
     __name__,
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        {"name": "theme-color", "content": "#3498db"}
+        {"name": "theme-color", "content": COLORS["background"]}
     ],
     external_stylesheets=[
         'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap'
@@ -22,41 +37,32 @@ app = dash.Dash(
 )
 server = app.server
 
-# Continue with the rest of your app's setup...
-
-
-
-
 def ensure_files_exist():
     """Ensure required files exist with proper permissions."""
     for file_path in [DATA_FILE, REPORT_FILE]:
         try:
-            # Create the file if it doesn't exist
             if not os.path.exists(file_path):
                 open(file_path, 'a').close()
                 print(f"Created file: {file_path}")
             
-            # Ensure the file is writable
             os.chmod(file_path, 0o666)
         except Exception as e:
             print(f"Error ensuring file {file_path} exists: {e}")
 
 def load_data():
-    """Load data from CSV file with improved error handling and filtering."""
+    """Load and filter Bitcoin price data."""
     try:
-        # Load all data for today
         today = datetime.date.today().strftime("%Y-%m-%d")
         df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
         df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
         
-        # Filter for today's data and remove any extreme outliers
         today_data = df[df["Timestamp"].dt.date == datetime.date.today()]
         
         if today_data.empty:
             return pd.DataFrame(columns=["Timestamp", "Price"])
         
-        # Remove outliers using Interquartile Range (IQR) method
+        # Advanced outlier removal
         Q1 = today_data["Price"].quantile(0.25)
         Q3 = today_data["Price"].quantile(0.75)
         IQR = Q3 - Q1
@@ -75,13 +81,12 @@ def load_data():
         return pd.DataFrame(columns=["Timestamp", "Price"])
 
 def load_daily_report():
-    """Enhanced daily report loading with more robust error handling."""
+    """Load and generate daily Bitcoin report."""
     try:
         cols = ["Date", "Open", "Close", "Max", "Min", "Evolution"]
         df = pd.read_csv(REPORT_FILE, names=cols, header=None)
         df["Date"] = pd.to_datetime(df["Date"])
         
-        # Always generate a report for today
         today = datetime.date.today()
         data = load_data()
         
@@ -115,53 +120,67 @@ def load_daily_report():
         return None
 
 def create_price_graph(df):
-    """Create a more adaptive and informative price graph."""
+    """Create an advanced price graph with professional styling."""
     if df.empty:
         return go.Figure()
 
-    # Calculate percentile-based y-axis limits for better scaling
+    # Dynamic Y-axis range
     lower_percentile = np.percentile(df["Price"], 5)
     upper_percentile = np.percentile(df["Price"], 95)
 
     fig = go.Figure()
     
+    # Advanced trace with gradient fill and smooth interpolation
     fig.add_trace(go.Scatter(
         x=df["Timestamp"],
         y=df["Price"],
         mode='lines+markers',
         name='Bitcoin Price',
-        line=dict(color=COLORS["bitcoin"], width=2.5),
-        marker=dict(size=5, color=COLORS["bitcoin"], opacity=0.7),
+        line=dict(color=COLORS["primary"], width=3, shape='spline'),
+        marker=dict(size=6, color=COLORS["primary"], opacity=0.7),
         fill='tozeroy',
-        fillcolor=f'rgba({242}, {169}, {0}, 0.1)'
+        fillcolor=f'rgba({242}, {147}, {26}, 0.2)'
     ))
     
     fig.update_layout(
-        title=f"Bitcoin Price Trend ({datetime.date.today()})",
+        title={
+            'text': f"Bitcoin Price Trend ({datetime.date.today()})",
+            'y':0.95,
+            'x':0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': dict(color=COLORS["text_primary"], size=16)
+        },
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
-        font=dict(family="Arial, sans-serif", color=COLORS["text"]),
+        font=dict(family="Inter, sans-serif", color=COLORS["text_primary"]),
         xaxis=dict(
             title="Time",
             showgrid=True,
             gridcolor=COLORS["grid"],
-            tickangle=-45
+            tickangle=-45,
+            color=COLORS["text_secondary"]
         ),
         yaxis=dict(
             title="Price (USD)",
             showgrid=True,
             gridcolor=COLORS["grid"],
             tickprefix="$",
-            range=[lower_percentile * 0.99, upper_percentile * 1.01]  # Dynamic range
+            range=[lower_percentile * 0.99, upper_percentile * 1.01],
+            color=COLORS["text_secondary"]
         ),
         margin=dict(l=50, r=50, t=50, b=50),
-        hovermode="x unified"
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor=COLORS["background"],
+            font_color=COLORS["text_primary"]
+        )
     )
     
     return fig
 
-# Dashboard Layout
 def create_dashboard_layout():
+    """Create a modern, professional dashboard layout."""
     return html.Div([
         html.Div([
             html.H1("Bitcoin Live Monitor", className="dashboard-title"),
@@ -177,12 +196,17 @@ def create_dashboard_layout():
                 html.Div(id="daily-report", className="report-container")
             ])
         ], className="content-wrapper")
-    ], className="dashboard-container")
+    ], className="dashboard-container", style={
+        'backgroundColor': COLORS["background"],
+        'color': COLORS["text_primary"],
+        'padding': '20px',
+        'fontFamily': 'Inter, sans-serif'
+    })
 
 app.layout = html.Div([
     create_dashboard_layout(),
-    dcc.Interval(id="graph-update", interval=60000),
-    dcc.Interval(id="report-update", interval=3600000)
+    dcc.Interval(id="graph-update", interval=60000),  # Update every minute
+    dcc.Interval(id="report-update", interval=3600000)  # Update hourly
 ])
 
 @app.callback(
@@ -255,10 +279,7 @@ def update_daily_report(n):
         ], className="report-grid")
     ], className="report-container")
 
-# Ensure files exist before running
-ensure_files_exist()
-# Ajoutez ces styles à votre fichier CSS ou dans un style inline
-# -------------------- STYLES CSS --------------------
+# Custom Index String with Dark Mode Styling
 app.index_string = """
 <!DOCTYPE html>
 <html>
@@ -269,113 +290,82 @@ app.index_string = """
         {%css%}
         <style>
             body {
-                font-family: 'Roboto', sans-serif;
+                font-family: 'Inter', sans-serif;
                 margin: 0;
                 padding: 0;
-                background-color: #f9f9f9;
-                color: #333333;
+                background-color: #1C1C1E;
+                color: #FFFFFF;
+                line-height: 1.6;
             }
-            #dashboard-container {
-                max-width: 1200px;
+            .dashboard-container {
+                max-width: 1400px;
                 margin: 0 auto;
-                padding: 20px;
+                padding: 30px;
             }
-            .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 30px;
-                padding-bottom: 20px;
-                border-bottom: 2px solid #f2a900;
-            }
-            .header-title {
-                font-size: 28px;
+            .dashboard-title {
+                color: #F7931A;
+                font-size: 32px;
                 font-weight: 700;
-                margin: 0;
-                color: #333333;
-            }
-            .header-price {
-                display: flex;
-                align-items: center;
-            }
-            .bitcoin-logo {
-                height: 32px;
-                margin-right: 10px;
+                margin-bottom: 20px;
+                text-align: center;
             }
             .current-price {
-                font-size: 24px;
-                font-weight: 700;
-                color: #f2a900;
+                text-align: center;
+                font-size: 48px;
+                font-weight: 600;
+                color: #F7931A;
+                margin-bottom: 30px;
             }
-            .main-content {
+            .content-wrapper {
                 display: flex;
-                flex-wrap: wrap;
-                gap: 20px;
+                gap: 30px;
             }
             .graph-container {
                 flex: 2;
-                min-width: 300px;
+                background-color: #2C2C2E;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
             }
             .report-container {
                 flex: 1;
-                min-width: 300px;
-            }
-            .card {
-                background-color: white;
-                border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                background-color: #2C2C2E;
+                border-radius: 12px;
                 padding: 20px;
-                height: 100%;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
             }
-            .card-title {
-                margin-top: 0;
+            .report-title {
+                color: #F7931A;
+                font-size: 24px;
                 margin-bottom: 20px;
-                font-size: 20px;
-                font-weight: 500;
-                color: #333333;
+                border-bottom: 2px solid #F7931A;
                 padding-bottom: 10px;
-                border-bottom: 1px solid #eee;
             }
-            .main-graph {
-                height: 400px;
-            }
-            .stats-container {
+            .report-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: 15px;
             }
-            .stat-item {
-                background-color: #f9f9f9;
-                border-radius: 6px;
-                padding: 12px;
-                text-align: center;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            .report-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 10px;
+                background-color: #1C1C1E;
+                border-radius: 8px;
             }
-            .stat-label {
+            .report-label {
+                color: #B0B0B0;
                 font-size: 14px;
-                color: #666666;
-                margin-bottom: 5px;
             }
-            .stat-value {
-                font-size: 18px;
-                font-weight: 500;
+            .report-value {
+                color: #FFFFFF;
+                font-weight: 600;
             }
-            /* Responsive design */
             @media (max-width: 768px) {
-                .header {
+                .content-wrapper {
                     flex-direction: column;
-                    align-items: flex-start;
-                    gap: 15px;
                 }
-                .header-price {
-                    width: 100%;
-                    justify-content: flex-start;
-                }
-                .main-graph {
-                    height: 300px;
-                }
-                .stats-container {
-                    grid-template-columns: repeat(2, 1fr);
+                .current-price {
+                    font-size: 36px;
                 }
             }
         </style>
@@ -390,5 +380,9 @@ app.index_string = """
     </body>
 </html>
 """
+
+# Ensure files exist before running
+ensure_files_exist()
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
