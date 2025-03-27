@@ -30,31 +30,15 @@ MIN=$(cut -d',' -f2 temp_data.csv | sort -n | head -n1)
 # Calcul de la variation en pourcentage
 EVOLUTION=$(awk "BEGIN {print (($CLOSE - $OPEN) / $OPEN) * 100}")
 
-# Vérification de la validité des prix pour éviter les erreurs
-if ! [[ "$OPEN" =~ ^[0-9]+(\.[0-9]+)?$ ]] || ! [[ "$CLOSE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-    echo "[$(date)] ❌ OPEN ou CLOSE non numériques!" >> "$LOG_FILE"
-    rm temp_data.csv
-    exit 1
-fi
-
-# Calcul de la volatilité (écart-type des prix)
-PRICES=$(cut -d',' -f2 temp_data.csv)
-echo "Prices: $PRICES"   # Affichage des prix pour déboguer
-VOLATILITY=$(echo "$PRICES" | tr ',' '\n' | awk '{sum+=$1; sumsq+=$1*$1} END {print sqrt(sumsq/NR - (sum/NR)**2)}')
-
 # Vérifier si les calculs sont valides
-if [[ -z "$OPEN" || -z "$CLOSE" || -z "$MAX" || -z "$MIN" || -z "$VOLATILITY" ]]; then
+if [[ -z "$OPEN" || -z "$CLOSE" || -z "$MAX" || -z "$MIN" ]]; then
     echo "[$(date)] ❌ Calculs invalides !" >> "$LOG_FILE"
     rm temp_data.csv
     exit 1
 fi
 
-# Afficher les résultats intermédiaires pour le débogage
-echo "Open: $OPEN, Close: $CLOSE, Max: $MAX, Min: $MIN"
-echo "Evolution: $EVOLUTION, Volatility: $VOLATILITY"
-
-# Écrire dans le fichier rapport avec un timestamp précis et inclure la volatilité
-echo "$CURRENT_TIMESTAMP,$OPEN,$CLOSE,$MAX,$MIN,${EVOLUTION}%,${VOLATILITY}" > "$REPORT_FILE"
+# Écrire dans le fichier rapport avec un timestamp précis
+echo "$CURRENT_TIMESTAMP,$OPEN,$CLOSE,$MAX,$MIN,${EVOLUTION}%" > "$REPORT_FILE"
 echo "[$(date)] ✅ Rapport généré : $CURRENT_TIMESTAMP" >> "$LOG_FILE"
 
 # Nettoyage
