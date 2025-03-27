@@ -56,7 +56,7 @@ def load_data():
 def load_daily_report():
     """Load the daily report from the CSV file with precise timestamp."""
     try:
-        cols = ["Timestamp", "Open", "Close", "Max", "Min", "Evolution"]
+        cols = ["Timestamp", "Open", "Close", "Max", "Min", "Evolution", "Volatility"]
         df = pd.read_csv(REPORT_FILE, names=cols, header=None)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"])
         
@@ -69,13 +69,15 @@ def load_daily_report():
                 "Close": 0,
                 "Max": 0,
                 "Min": 0,
-                "Evolution": "0%"
+                "Evolution": "0%",
+                "Volatility": 0
             })
         
         return df.iloc[-1]  # Return the most recent report
     except Exception as e:
         print(f"❌ Report loading error: {e}")
         return None
+
 
 def create_price_graph(df):
     """Create a responsive and visually appealing price graph."""
@@ -216,11 +218,16 @@ def update_dashboard(n):
                     html.Span(str(report["Evolution"]), 
                               className="report-value", 
                               style={"color": COLORS["positive"] if float(str(report["Evolution"]).rstrip('%')) >= 0 else COLORS["negative"]})
+                ], className="report-item"),
+                html.Div([
+                    html.Span("Volatility", className="report-label"),
+                    html.Span(f"{report['Volatility']:.4f}", className="report-value")  # Show volatility here
                 ], className="report-item")
             ], className="report-grid")
         ], className="report-container")
     
     return fig, current_price, daily_report_html
+
 
 # Application Layout
 app.layout = html.Div([
