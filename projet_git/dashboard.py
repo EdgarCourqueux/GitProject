@@ -78,6 +78,8 @@ def load_daily_report():
 
 def create_price_graph(df):
     """Create a responsive and visually appealing price graph."""
+    lower_percentile = np.percentile(df["Price"], 5)
+    upper_percentile = np.percentile(df["Price"], 95)
     if df.empty:
         return go.Figure()
 
