@@ -7,6 +7,7 @@ import subprocess
 import datetime
 import pytz
 import os
+import numpy as np
 
 # Application Initialization
 app = dash.Dash(
@@ -20,7 +21,7 @@ BASE_PATH = "/app"
 DATA_FILE = os.path.join(BASE_PATH, "projet.csv")
 REPORT_FILE = os.path.join(BASE_PATH, "daily_report.csv")
 TZ_PARIS = pytz.timezone("Europe/Paris")
-MAX_DATA_POINTS = 100
+MAX_DATA_POINTS = 200  # Increased for more detailed view
 
 # Design Theme
 COLORS = {
@@ -33,35 +34,51 @@ COLORS = {
     "grid": "#ecf0f1"
 }
 
-def ensure_files_exist():
-    """Ensure required files exist."""
-    for file_path in [DATA_FILE, REPORT_FILE]:
-        if not os.path.exists(file_path):
-            open(file_path, 'a').close()
-            print(f"Created file: {file_path}")
-
 def load_data():
-    """Load data from CSV file with error handling."""
+    """Load data from CSV file with improved error handling and filtering."""
     try:
+        # Load all data for today
+        today = datetime.date.today().strftime("%Y-%m-%d")
         df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
         df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
-        df = df.dropna().sort_values("Timestamp")
-        return df.tail(MAX_DATA_POINTS)
+        
+        # Filter for today's data and remove any extreme outliers
+        today_data = df[df["Timestamp"].dt.date == datetime.date.today()]
+        
+        if today_data.empty:
+            return pd.DataFrame(columns=["Timestamp", "Price"])
+        
+        # Remove outliers using Interquartile Range (IQR) method
+        Q1 = today_data["Price"].quantile(0.25)
+        Q3 = today_data["Price"].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        filtered_data = today_data[
+            (today_data["Price"] >= lower_bound) & 
+            (today_data["Price"] <= upper_bound)
+        ]
+        
+        return filtered_data.sort_values("Timestamp").tail(MAX_DATA_POINTS)
+    
     except Exception as e:
         print(f"❌ Data loading error: {e}")
         return pd.DataFrame(columns=["Timestamp", "Price"])
 
 def load_daily_report():
-    """Load the daily report from the CSV file."""
+    """Enhanced daily report loading with more robust error handling."""
     try:
         cols = ["Date", "Open", "Close", "Max", "Min", "Evolution"]
         df = pd.read_csv(REPORT_FILE, names=cols, header=None)
         df["Date"] = pd.to_datetime(df["Date"])
         
-        # If no data, return a default/empty report
-        if df.empty:
-            today = datetime.date.today()
+        # Always generate a report for today
+        today = datetime.date.today()
+        data = load_data()
+        
+        if data.empty:
             return pd.Series({
                 "Date": today,
                 "Open": 0,
@@ -71,15 +88,33 @@ def load_daily_report():
                 "Evolution": "0%"
             })
         
-        return df.iloc[-1]  # Return the most recent report
+        open_price = data["Price"].iloc[0]
+        close_price = data["Price"].iloc[-1]
+        max_price = data["Price"].max()
+        min_price = data["Price"].min()
+        evolution = ((close_price - open_price) / open_price * 100)
+        
+        return pd.Series({
+            "Date": today,
+            "Open": open_price,
+            "Close": close_price,
+            "Max": max_price,
+            "Min": min_price,
+            "Evolution": f"{evolution:.2f}%"
+        })
+    
     except Exception as e:
         print(f"❌ Report loading error: {e}")
         return None
 
 def create_price_graph(df):
-    """Create a responsive and visually appealing price graph."""
+    """Create a more adaptive and informative price graph."""
     if df.empty:
         return go.Figure()
+
+    # Calculate percentile-based y-axis limits for better scaling
+    lower_percentile = np.percentile(df["Price"], 5)
+    upper_percentile = np.percentile(df["Price"], 95)
 
     fig = go.Figure()
     
@@ -95,7 +130,7 @@ def create_price_graph(df):
     ))
     
     fig.update_layout(
-        title="Bitcoin Price Trend",
+        title=f"Bitcoin Price Trend ({datetime.date.today()})",
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
         font=dict(family="Arial, sans-serif", color=COLORS["text"]),
@@ -109,7 +144,8 @@ def create_price_graph(df):
             title="Price (USD)",
             showgrid=True,
             gridcolor=COLORS["grid"],
-            tickprefix="$"
+            tickprefix="$",
+            range=[lower_percentile * 0.99, upper_percentile * 1.01]  # Dynamic range
         ),
         margin=dict(l=50, r=50, t=50, b=50),
         hovermode="x unified"
