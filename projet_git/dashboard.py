@@ -81,6 +81,10 @@ def create_price_graph(df):
     if df.empty:
         return go.Figure()
 
+    # Calculate percentile-based y-axis limits for better scaling
+    lower_percentile = np.percentile(df["Price"], 5)
+    upper_percentile = np.percentile(df["Price"], 95)
+
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
@@ -109,7 +113,8 @@ def create_price_graph(df):
             title="Price (USD)",
             showgrid=True,
             gridcolor=COLORS["grid"],
-            tickprefix="$"
+            tickprefix="$",
+            range=[lower_percentile * 0.99, upper_percentile * 1.01]  # Dynamic range
         ),
         margin=dict(l=50, r=50, t=50, b=50),
         hovermode="x unified"
