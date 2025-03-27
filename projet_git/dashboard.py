@@ -84,8 +84,14 @@ def create_price_graph(df):
     if df.empty:
         return go.Figure()
 
+    min_price = df["Price"].min()
+    max_price = df["Price"].max()
+    min_timestamp = df[df["Price"] == min_price]["Timestamp"].iloc[0]
+    max_timestamp = df[df["Price"] == max_price]["Timestamp"].iloc[0]
+
     fig = go.Figure()
-    
+
+    # Main price line
     fig.add_trace(go.Scatter(
         x=df["Timestamp"],
         y=df["Price"],
@@ -96,7 +102,16 @@ def create_price_graph(df):
         fill='tozeroy',
         fillcolor=f'rgba({242}, {169}, {0}, 0.1)'
     ))
-    
+
+    # Markers for min and max prices
+    fig.add_trace(go.Scatter(
+        x=[min_timestamp, max_timestamp],
+        y=[min_price, max_price],
+        mode='markers',
+        marker=dict(color=["red", "green"], size=10),
+        name='Min/Max Prices'
+    ))
+
     fig.update_layout(
         title="Bitcoin Price Trend",
         plot_bgcolor=COLORS["background"],
@@ -118,8 +133,9 @@ def create_price_graph(df):
         margin=dict(l=50, r=50, t=50, b=50),
         hovermode="x unified"
     )
-    
+
     return fig
+
 
 def create_dashboard_layout():
     """Create the dashboard layout."""
