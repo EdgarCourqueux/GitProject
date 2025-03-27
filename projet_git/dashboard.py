@@ -282,7 +282,7 @@ app.index_string = """
             }
             .graph-container, .report-container {
                 flex: 1 1 100%; /* Permet à chaque conteneur de prendre toute la largeur sur petits écrans */
-                max-width: 48%; /* Utilisez jusqu'à 48% de l'espace disponible sur grands écrans */
+                max-width: 60%; /* Utilisez jusqu'à 48% de l'espace disponible sur grands écrans */
                 min-width: 300px; /* Assure une largeur minimale pour la lisibilité */
                 padding: 15px; /* Ajustez le padding pour réduire l'espace interne */
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
