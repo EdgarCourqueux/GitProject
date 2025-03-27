@@ -5,92 +5,63 @@ import plotly.graph_objects as go
 import pandas as pd
 import subprocess
 import datetime
+import pytz
 import os
-import numpy as np
-
-# Constants and Configuration
-DATA_FILE = "/app/bitcoin_prices.csv"
-REPORT_FILE = "/app/daily_reports.csv"
-MAX_DATA_POINTS = 100
-
-# Color Palette
-COLORS = {
-    "background": "#1C1C1E",
-    "primary": "#F7931A",  # Bitcoin Orange
-    "text_primary": "#FFFFFF",
-    "text_secondary": "#B0B0B0",
-    "grid": "#2C2C2E",
-    "positive": "#4CAF50",
-    "negative": "#F44336"
-}
 
 # Application Initialization
 app = dash.Dash(
     __name__,
-    meta_tags=[
-        {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        {"name": "theme-color", "content": COLORS["background"]}
-    ],
-    external_stylesheets=[
-        'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap'
-    ]
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}]
 )
 server = app.server
 
+# Configuration Constants
+BASE_PATH = "/app"
+DATA_FILE = os.path.join(BASE_PATH, "projet.csv")
+REPORT_FILE = os.path.join(BASE_PATH, "daily_report.csv")
+TZ_PARIS = pytz.timezone("Europe/Paris")
+MAX_DATA_POINTS = 100
+
+# Design Theme
+COLORS = {
+    "background": "#f4f6f9",
+    "text": "#2c3e50",
+    "bitcoin": "#f2a900",
+    "positive": "#2ecc71",
+    "negative": "#e74c3c",
+    "card_bg": "#ffffff",
+    "grid": "#ecf0f1"
+}
+
 def ensure_files_exist():
-    """Ensure required files exist with proper permissions."""
+    """Ensure required files exist."""
     for file_path in [DATA_FILE, REPORT_FILE]:
-        try:
-            if not os.path.exists(file_path):
-                open(file_path, 'a').close()
-                print(f"Created file: {file_path}")
-            
-            os.chmod(file_path, 0o666)
-        except Exception as e:
-            print(f"Error ensuring file {file_path} exists: {e}")
+        if not os.path.exists(file_path):
+            open(file_path, 'a').close()
+            print(f"Created file: {file_path}")
 
 def load_data():
-    """Load and filter Bitcoin price data."""
+    """Load data from CSV file with error handling."""
     try:
-        today = datetime.date.today().strftime("%Y-%m-%d")
         df = pd.read_csv(DATA_FILE, names=["Timestamp", "Price"], header=None)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
         df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
-        
-        today_data = df[df["Timestamp"].dt.date == datetime.date.today()]
-        
-        if today_data.empty:
-            return pd.DataFrame(columns=["Timestamp", "Price"])
-        
-        # Advanced outlier removal
-        Q1 = today_data["Price"].quantile(0.25)
-        Q3 = today_data["Price"].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        
-        filtered_data = today_data[
-            (today_data["Price"] >= lower_bound) & 
-            (today_data["Price"] <= upper_bound)
-        ]
-        
-        return filtered_data.sort_values("Timestamp").tail(MAX_DATA_POINTS)
-    
+        df = df.dropna().sort_values("Timestamp")
+        return df.tail(MAX_DATA_POINTS)
     except Exception as e:
         print(f"❌ Data loading error: {e}")
         return pd.DataFrame(columns=["Timestamp", "Price"])
 
 def load_daily_report():
-    """Load and generate daily Bitcoin report."""
+    """Load the daily report from the CSV file."""
     try:
         cols = ["Date", "Open", "Close", "Max", "Min", "Evolution"]
         df = pd.read_csv(REPORT_FILE, names=cols, header=None)
         df["Date"] = pd.to_datetime(df["Date"])
         
-        today = datetime.date.today()
-        data = load_data()
-        
-        if data.empty:
+        # If no data, return a default/empty report
+        if df.empty:
+            today = datetime.date.today()
             return pd.Series({
                 "Date": today,
                 "Open": 0,
@@ -100,87 +71,54 @@ def load_daily_report():
                 "Evolution": "0%"
             })
         
-        open_price = data["Price"].iloc[0]
-        close_price = data["Price"].iloc[-1]
-        max_price = data["Price"].max()
-        min_price = data["Price"].min()
-        evolution = ((close_price - open_price) / open_price * 100)
-        
-        return pd.Series({
-            "Date": today,
-            "Open": open_price,
-            "Close": close_price,
-            "Max": max_price,
-            "Min": min_price,
-            "Evolution": f"{evolution:.2f}%"
-        })
-    
+        return df.iloc[-1]  # Return the most recent report
     except Exception as e:
         print(f"❌ Report loading error: {e}")
         return None
 
 def create_price_graph(df):
-    """Create an advanced price graph with professional styling."""
+    """Create a responsive and visually appealing price graph."""
     if df.empty:
         return go.Figure()
 
-    # Dynamic Y-axis range
-    lower_percentile = np.percentile(df["Price"], 5)
-    upper_percentile = np.percentile(df["Price"], 95)
-
     fig = go.Figure()
     
-    # Advanced trace with gradient fill and smooth interpolation
     fig.add_trace(go.Scatter(
         x=df["Timestamp"],
         y=df["Price"],
         mode='lines+markers',
         name='Bitcoin Price',
-        line=dict(color=COLORS["primary"], width=3, shape='spline'),
-        marker=dict(size=6, color=COLORS["primary"], opacity=0.7),
+        line=dict(color=COLORS["bitcoin"], width=2.5),
+        marker=dict(size=5, color=COLORS["bitcoin"], opacity=0.7),
         fill='tozeroy',
-        fillcolor=f'rgba({242}, {147}, {26}, 0.2)'
+        fillcolor=f'rgba({242}, {169}, {0}, 0.1)'
     ))
     
     fig.update_layout(
-        title={
-            'text': f"Bitcoin Price Trend ({datetime.date.today()})",
-            'y':0.95,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': dict(color=COLORS["text_primary"], size=16)
-        },
+        title="Bitcoin Price Trend",
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
-        font=dict(family="Inter, sans-serif", color=COLORS["text_primary"]),
+        font=dict(family="Arial, sans-serif", color=COLORS["text"]),
         xaxis=dict(
             title="Time",
             showgrid=True,
             gridcolor=COLORS["grid"],
-            tickangle=-45,
-            color=COLORS["text_secondary"]
+            tickangle=-45
         ),
         yaxis=dict(
             title="Price (USD)",
             showgrid=True,
             gridcolor=COLORS["grid"],
-            tickprefix="$",
-            range=[lower_percentile * 0.99, upper_percentile * 1.01],
-            color=COLORS["text_secondary"]
+            tickprefix="$"
         ),
         margin=dict(l=50, r=50, t=50, b=50),
-        hovermode="x unified",
-        hoverlabel=dict(
-            bgcolor=COLORS["background"],
-            font_color=COLORS["text_primary"]
-        )
+        hovermode="x unified"
     )
     
     return fig
 
+# Dashboard Layout (unchanged from previous version)
 def create_dashboard_layout():
-    """Create a modern, professional dashboard layout."""
     return html.Div([
         html.Div([
             html.H1("Bitcoin Live Monitor", className="dashboard-title"),
@@ -196,17 +134,12 @@ def create_dashboard_layout():
                 html.Div(id="daily-report", className="report-container")
             ])
         ], className="content-wrapper")
-    ], className="dashboard-container", style={
-        'backgroundColor': COLORS["background"],
-        'color': COLORS["text_primary"],
-        'padding': '20px',
-        'fontFamily': 'Inter, sans-serif'
-    })
+    ], className="dashboard-container")
 
 app.layout = html.Div([
     create_dashboard_layout(),
-    dcc.Interval(id="graph-update", interval=60000),  # Update every minute
-    dcc.Interval(id="report-update", interval=3600000)  # Update hourly
+    dcc.Interval(id="graph-update", interval=60000),
+    dcc.Interval(id="report-update", interval=3600000)
 ])
 
 @app.callback(
@@ -278,6 +211,11 @@ def update_daily_report(n):
             ], className="report-item")
         ], className="report-grid")
     ], className="report-container")
+
+# Rest of the CSS remains the same as in previous version
+
+# Ensure files exist before running
+ensure_files_exist()
 
 # Custom Index String with Dark Mode Styling
 app.index_string = """
