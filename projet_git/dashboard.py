@@ -22,128 +22,6 @@ app = dash.Dash(
 )
 server = app.server
 
-app.layout = html.Div([
-    html.Style('''
-        :root {
-            --bg-primary: #f4f6f9;
-            --text-primary: #2c3e50;
-            --accent-color: #3498db;
-            --bitcoin-color: #f2a900;
-            --positive-color: #2ecc71;
-            --negative-color: #e74c3c;
-            --card-bg: #ffffff;
-            --shadow-subtle: 0 4px 6px rgba(0, 0, 0, 0.05);
-            --shadow-hover: 0 10px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-
-        .dashboard-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: var(--shadow-subtle);
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .dashboard-container:hover {
-            box-shadow: var(--shadow-hover);
-        }
-
-        .dashboard-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--accent-color);
-            padding-bottom: 10px;
-        }
-
-        .dashboard-title {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--accent-color);
-            margin: 0;
-        }
-
-        .current-price {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: var(--bitcoin-color);
-        }
-
-        .content-wrapper {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-        }
-
-        .graph-container {
-            background-color: var(--bg-primary);
-            border-radius: 8px;
-            padding: 15px;
-        }
-
-        .report-container {
-            background-color: var(--bg-primary);
-            border-radius: 8px;
-            padding: 15px;
-        }
-
-        .report-title {
-            color: var(--accent-color);
-            border-bottom: 1px solid var(--accent-color);
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-
-        .report-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .report-item {
-            display: flex;
-            flex-direction: column;
-            background-color: var(--card-bg);
-            border-radius: 6px;
-            padding: 10px;
-            box-shadow: var(--shadow-subtle);
-        }
-
-        .report-label {
-            font-size: 0.8rem;
-            color: var(--text-primary);
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-
-        .report-value {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        @media (max-width: 768px) {
-            .content-wrapper {
-                grid-template-columns: 1fr;
-            }
-        }
-    '''),  # Your existing CSS
-    create_dashboard_layout(),
-    dcc.Interval(id="graph-update", interval=60000),
-    dcc.Interval(id="report-update", interval=3600000)
-], className="dashboard-container")
-
 # Continue with the rest of your app's setup...
 
 
@@ -380,6 +258,137 @@ def update_daily_report(n):
 # Ensure files exist before running
 ensure_files_exist()
 # Ajoutez ces styles à votre fichier CSS ou dans un style inline
-
+# -------------------- STYLES CSS --------------------
+app.index_string = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Bitcoin Live Dashboard</title>
+        {%metas%}
+        {%favicon%}
+        {%css%}
+        <style>
+            body {
+                font-family: 'Roboto', sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: #f9f9f9;
+                color: #333333;
+            }
+            #dashboard-container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #f2a900;
+            }
+            .header-title {
+                font-size: 28px;
+                font-weight: 700;
+                margin: 0;
+                color: #333333;
+            }
+            .header-price {
+                display: flex;
+                align-items: center;
+            }
+            .bitcoin-logo {
+                height: 32px;
+                margin-right: 10px;
+            }
+            .current-price {
+                font-size: 24px;
+                font-weight: 700;
+                color: #f2a900;
+            }
+            .main-content {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 20px;
+            }
+            .graph-container {
+                flex: 2;
+                min-width: 300px;
+            }
+            .report-container {
+                flex: 1;
+                min-width: 300px;
+            }
+            .card {
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                padding: 20px;
+                height: 100%;
+            }
+            .card-title {
+                margin-top: 0;
+                margin-bottom: 20px;
+                font-size: 20px;
+                font-weight: 500;
+                color: #333333;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #eee;
+            }
+            .main-graph {
+                height: 400px;
+            }
+            .stats-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 15px;
+            }
+            .stat-item {
+                background-color: #f9f9f9;
+                border-radius: 6px;
+                padding: 12px;
+                text-align: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            .stat-label {
+                font-size: 14px;
+                color: #666666;
+                margin-bottom: 5px;
+            }
+            .stat-value {
+                font-size: 18px;
+                font-weight: 500;
+            }
+            /* Responsive design */
+            @media (max-width: 768px) {
+                .header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 15px;
+                }
+                .header-price {
+                    width: 100%;
+                    justify-content: flex-start;
+                }
+                .main-graph {
+                    height: 300px;
+                }
+                .stats-container {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+        </style>
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+"""
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
