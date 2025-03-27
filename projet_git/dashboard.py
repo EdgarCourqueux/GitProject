@@ -264,6 +264,134 @@ def update_daily_report(n):
 
 # Ensure files exist before running
 ensure_files_exist()
+# Ajoutez ces styles à votre fichier CSS ou dans un style inline
 
+app.layout = html.Div([
+    html.Head(
+        html.Link(
+            rel='stylesheet', 
+            href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap'
+        )
+    ),
+    html.Style('''
+        :root {
+            --bg-primary: #f4f6f9;
+            --text-primary: #2c3e50;
+            --accent-color: #3498db;
+            --bitcoin-color: #f2a900;
+            --positive-color: #2ecc71;
+            --negative-color: #e74c3c;
+            --card-bg: #ffffff;
+            --shadow-subtle: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --shadow-hover: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-subtle);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-container:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        .dashboard-title {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            margin: 0;
+        }
+
+        .current-price {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--bitcoin-color);
+        }
+
+        .content-wrapper {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .graph-container {
+            background-color: var(--bg-primary);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .report-container {
+            background-color: var(--bg-primary);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .report-title {
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--accent-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .report-item {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--card-bg);
+            border-radius: 6px;
+            padding: 10px;
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .report-label {
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .report-value {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .content-wrapper {
+                grid-template-columns: 1fr;
+            }
+        }
+    '''),
+    create_dashboard_layout(),
+    dcc.Interval(id="graph-update", interval=60000),
+    dcc.Interval(id="report-update", interval=3600000)
+], className="dashboard-container")
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
