@@ -84,14 +84,8 @@ def create_price_graph(df):
     if df.empty:
         return go.Figure()
 
-    min_price = df["Price"].min()
-    max_price = df["Price"].max()
-    min_timestamp = df[df["Price"] == min_price]["Timestamp"].iloc[0]
-    max_timestamp = df[df["Price"] == max_price]["Timestamp"].iloc[0]
-
     fig = go.Figure()
-
-    # Main price line
+    
     fig.add_trace(go.Scatter(
         x=df["Timestamp"],
         y=df["Price"],
@@ -102,16 +96,7 @@ def create_price_graph(df):
         fill='tozeroy',
         fillcolor=f'rgba({242}, {169}, {0}, 0.1)'
     ))
-
-    # Markers for min and max prices
-    fig.add_trace(go.Scatter(
-        x=[min_timestamp, max_timestamp],
-        y=[min_price, max_price],
-        mode='markers',
-        marker=dict(color=["red", "green"], size=10),
-        name='Min/Max Prices'
-    ))
-
+    
     fig.update_layout(
         title="Bitcoin Price Trend",
         plot_bgcolor=COLORS["background"],
@@ -133,9 +118,8 @@ def create_price_graph(df):
         margin=dict(l=50, r=50, t=50, b=50),
         hovermode="x unified"
     )
-
+    
     return fig
-
 
 def create_dashboard_layout():
     """Create the dashboard layout."""
@@ -248,11 +232,19 @@ app.index_string = """
                 line-height: 1.6;
             }
             .dashboard-container {
-                max-width: 100%;  /* Assurez-vous que le conteneur ne dépasse pas 100% de la largeur de l'écran */
-                width: 100%;      /* Force le conteneur à s'adapter à la largeur de l'écran */
-                margin: 0 auto;   /* Centrer le conteneur */
-                padding: 30px;    /* Conservez un padding pour un peu d'espace autour du contenu */
-                box-sizing: border-box; /* Inclut padding et border dans la largeur et hauteur totale */
+                max-width: 100%; 
+                width: 100%;      
+                margin: 0 auto;   
+                padding: 20px;    
+                box-sizing: border-box; 
+                overflow: hidden; /* Empêche le débordement horizontal */
+            }
+            .content-wrapper {
+                display: flex;
+                flex-direction: row; /* Assure que les éléments sont en ligne sur grands écrans */
+                flex-wrap: wrap; /* Permet aux éléments de passer à la ligne sur petits écrans */
+                gap: 20px;
+                justify-content: center; /* Centre les éléments dans le conteneur */
             }
             .dashboard-title {
                 color: #F7931A;
@@ -272,19 +264,12 @@ app.index_string = """
                 display: flex;
                 gap: 30px;
             }
-            .graph-container {
-                flex: 2;
-                background-color: #2C2C2E;
-                border-radius: 12px;
-                padding: 20px;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-            }
-            .report-container {
-                flex: 1;
-                background-color: #2C2C2E;
-                border-radius: 12px;
-                padding: 20px;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            .graph-container, .report-container {
+                flex: 1 1 100%; /* Permet à chaque conteneur de prendre toute la largeur sur petits écrans */
+                max-width: 48%; /* Utilisez jusqu'à 48% de l'espace disponible sur grands écrans */
+                min-width: 300px; /* Assure une largeur minimale pour la lisibilité */
+                padding: 15px; /* Ajustez le padding pour réduire l'espace interne */
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             }
             .report-title {
                 color: #F7931A;
@@ -311,13 +296,13 @@ app.index_string = """
             .report-value {
                 color: #FFFFFF;
                 font-weight: 600;
-            }
+            }   
             @media (max-width: 768px) {
                 .content-wrapper {
-                    flex-direction: column;
+                    flex-direction: column; /* Empile les conteneurs verticalement sur petits écrans */
                 }
-                .current-price {
-                    font-size: 36px;
+                .graph-container, .report-container {
+                    max-width: 100%; /* Prend toute la largeur disponible sur petits écrans */
                 }
             }
         </style>
