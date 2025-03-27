@@ -44,6 +44,7 @@ fi
 # Écrire dans le fichier rapport avec un timestamp précis et inclure la volatilité
 echo "$CURRENT_TIMESTAMP,$OPEN,$CLOSE,$MAX,$MIN,${EVOLUTION}%,${VOLATILITY}" > "$REPORT_FILE"
 echo "[$(date)] ✅ Rapport généré : $CURRENT_TIMESTAMP" >> "$LOG_FILE"
-
+echo "Open: $OPEN, Close: $CLOSE, Max: $MAX, Min: $MIN"
+echo "Evolution: $EVOLUTION, Volatility: $VOLATILITY"
 # Nettoyage
 rm temp_data.csv
