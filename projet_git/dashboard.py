@@ -683,7 +683,14 @@ app.index_string = """
             }
             
             .dashboard-header {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
                 margin-bottom: 30px;
+                padding: 20px;
+                background-color: #2C2C2E;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             }
             
             .content-wrapper {
@@ -706,23 +713,54 @@ app.index_string = """
                 font-size: 48px;
                 font-weight: 600;
                 color: #F7931A;
-                margin-bottom: 30px;
+                margin-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .prediction-label {
+                font-size: 14px;
+                color: #9B59B6;
+                margin-top: 5px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .prediction-line {
+                display: inline-block;
+                width: 20px;
+                height: 3px;
+                background: #9B59B6;
+                margin-right: 8px;
+                border-radius: 2px;
+                border-top: 2px dashed #9B59B6;
             }
             
             .graph-container {
                 background-color: #2C2C2E;
                 border-radius: 12px;
-                padding: 15px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                padding: 20px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                 margin-bottom: 20px;
+                transition: transform 0.2s ease-in-out;
+            }
+            
+            .graph-container:hover {
+                transform: translateY(-5px);
             }
             
             .report-card {
                 background-color: #2C2C2E;
                 border-radius: 12px;
                 padding: 20px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
                 margin-bottom: 20px;
+                transition: transform 0.2s ease-in-out;
+            }
+            
+            .report-card:hover {
+                transform: translateY(-5px);
             }
             
             .report-title {
@@ -731,6 +769,18 @@ app.index_string = """
                 margin-bottom: 20px;
                 border-bottom: 2px solid #F7931A;
                 padding-bottom: 10px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .report-title::before {
+                content: "";
+                display: inline-block;
+                width: 6px;
+                height: 20px;
+                background-color: #F7931A;
+                margin-right: 10px;
+                border-radius: 3px;
             }
             
             .report-grid {
@@ -744,6 +794,11 @@ app.index_string = """
                 padding: 15px;
                 background-color: #3A3A3C;
                 border-radius: 8px;
+                transition: background-color 0.2s ease;
+            }
+            
+            .report-item:hover {
+                background-color: #4A4A4C;
             }
             
             .report-label {
@@ -768,6 +823,11 @@ app.index_string = """
                 background-color: #3A3A3C;
                 border-radius: 8px;
                 padding: 15px;
+                transition: background-color 0.2s ease;
+            }
+            
+            .risk-item:hover {
+                background-color: #4A4A4C;
             }
             
             .risk-header {
@@ -793,6 +853,43 @@ app.index_string = """
                 color: #8E8E93;
                 font-size: 12px;
                 font-style: italic;
+            }
+            
+            /* Légende pour la prédiction */
+            .prediction-legend {
+                display: flex;
+                justify-content: center;
+                margin-top: 10px;
+                padding: 10px;
+                background-color: rgba(58, 58, 60, 0.6);
+                border-radius: 8px;
+                width: fit-content;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin-right: 20px;
+                font-size: 12px;
+                color: #B0B0B0;
+            }
+            
+            .legend-color {
+                width: 20px;
+                height: 3px;
+                margin-right: 8px;
+                border-radius: 2px;
+            }
+            
+            .legend-color.actual {
+                background-color: #F7931A;
+            }
+            
+            .legend-color.prediction {
+                background-color: #9B59B6;
+                border-top: 2px dashed #9B59B6;
             }
             
             @media (min-width: 992px) {
@@ -829,16 +926,73 @@ app.index_string = """
                     margin-top: 5px;
                     width: 100%;
                 }
+                
+                .prediction-legend {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                
+                .legend-item {
+                    margin-right: 0;
+                    margin-bottom: 8px;
+                }
             }
         </style>
     </head>
     <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
+        <div class="dashboard-container">
+            <div class="dashboard-header">
+                <h1 class="dashboard-title">Bitcoin Live Monitor & Prédiction</h1>
+                <div id="current-price" class="current-price">
+                    <!-- Le prix actuel sera inséré ici -->
+                    <div class="prediction-legend">
+                        <div class="legend-item">
+                            <div class="legend-color actual"></div>
+                            <span>Prix Actuel</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color prediction"></div>
+                            <span>Prédiction</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="content-wrapper">
+                <div class="graph-container">
+                    <div id="price-graph">
+                        <!-- Le graphique des prix sera inséré ici -->
+                    </div>
+                </div>
+                
+                <div class="graph-container">
+                    <div id="volatility-graph">
+                        <!-- Le graphique de volatilité sera inséré ici -->
+                    </div>
+                </div>
+                
+                <div class="report-card">
+                    <div id="daily-report" class="report-container">
+                        <!-- Le rapport quotidien sera inséré ici -->
+                    </div>
+                </div>
+                
+                <div class="report-card">
+                    <div id="risk-metrics" class="report-container">
+                        <!-- Les métriques de risque seront insérées ici -->
+                    </div>
+                </div>
+                
+                <div class="report-card">
+                    <div id="prediction-metrics" class="report-container">
+                        <!-- Les métriques de prédiction seront insérées ici -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Interval component pour mettre à jour les données -->
+            <div id="interval-component"></div>
+        </div>
     </body>
 </html>
 """
