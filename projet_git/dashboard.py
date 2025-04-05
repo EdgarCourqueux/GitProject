@@ -1,4 +1,3 @@
-
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -357,26 +356,40 @@ def update_dashboard(n):
             ], className="report-grid")
         ], className="report-container")
     
-    # Create risk metrics card
+    # Create risk metrics card with improved layout
     risk_metrics_html = html.Div([
         html.H3("Métriques de Risque", className="report-title"),
         html.Div([
             html.Div([
-                html.Span("Volatilité (annualisée)", className="report-label"),
-                html.Span(f"{volatility * 100:.2f}%", className="report-value"),
-                html.Div("Mesure de la variance des prix sur la période", className="metric-description")
-            ], className="report-item"),
+                html.Div([
+                    html.Span("Volatilité (annualisée)", className="risk-label"),
+                    html.Div([
+                        html.Span(f"{volatility * 100:.2f}%", className="risk-value"),
+                    ], className="risk-value-container")
+                ], className="risk-header"),
+                html.Div("Mesure de la variance des prix sur la période", className="risk-description")
+            ], className="risk-item"),
+            
             html.Div([
-                html.Span("VaR 95%", className="report-label"),
-                html.Span(f"{var_95:.2f}%", className="report-value"),
-                html.Div("Perte maximale sur une journée avec 95% de confiance", className="metric-description")
-            ], className="report-item"),
+                html.Div([
+                    html.Span("VaR 95%", className="risk-label"),
+                    html.Div([
+                        html.Span(f"{var_95:.2f}%", className="risk-value"),
+                    ], className="risk-value-container")
+                ], className="risk-header"),
+                html.Div("Perte maximale sur une journée avec 95% de confiance", className="risk-description")
+            ], className="risk-item"),
+            
             html.Div([
-                html.Span("VaR 99%", className="report-label"),
-                html.Span(f"{var_99:.2f}%", className="report-value"),
-                html.Div("Perte maximale sur une journée avec 99% de confiance", className="metric-description")
-            ], className="report-item")
-        ], className="report-grid")
+                html.Div([
+                    html.Span("VaR 99%", className="risk-label"),
+                    html.Div([
+                        html.Span(f"{var_99:.2f}%", className="risk-value"),
+                    ], className="risk-value-container")
+                ], className="risk-header"),
+                html.Div("Perte maximale sur une journée avec 99% de confiance", className="risk-description")
+            ], className="risk-item")
+        ], className="risk-grid")
     ], className="report-container")
     
     return price_fig, volatility_fig, current_price, daily_report_html, risk_metrics_html
@@ -494,10 +507,40 @@ app.index_string = """
                 font-size: 18px;
             }
             
-            .metric-description {
+            /* Styles spécifiques pour les métriques de risque */
+            .risk-grid {
+                display: grid;
+                gap: 15px;
+            }
+            
+            .risk-item {
+                background-color: #3A3A3C;
+                border-radius: 8px;
+                padding: 15px;
+            }
+            
+            .risk-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+            }
+            
+            .risk-label {
+                color: #B0B0B0;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            
+            .risk-value {
+                font-size: 18px;
+                font-weight: 600;
+                color: #FFFFFF;
+            }
+            
+            .risk-description {
                 color: #8E8E93;
                 font-size: 12px;
-                margin-top: 5px;
                 font-style: italic;
             }
             
@@ -524,6 +567,16 @@ app.index_string = """
                 
                 .current-price {
                     font-size: 36px;
+                }
+                
+                .risk-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                
+                .risk-value-container {
+                    margin-top: 5px;
+                    width: 100%;
                 }
             }
         </style>
