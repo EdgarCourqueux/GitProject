@@ -78,11 +78,12 @@ def load_daily_report():
         return None
 
 def create_price_graph(df):
-    """Create a responsive and visually appealing price graph."""
-    lower_percentile = np.percentile(df["Price"], 5)
-    upper_percentile = np.percentile(df["Price"], 95)
+    """Create a visually enhanced and interactive price graph."""
     if df.empty:
         return go.Figure()
+
+    lower_percentile = np.percentile(df["Price"], 5)
+    upper_percentile = np.percentile(df["Price"], 95)
 
     min_price = df["Price"].min()
     max_price = df["Price"].max()
@@ -91,50 +92,66 @@ def create_price_graph(df):
 
     fig = go.Figure()
 
-    # Main price line
+    # Price line
     fig.add_trace(go.Scatter(
         x=df["Timestamp"],
         y=df["Price"],
-        mode='lines+markers',
-        name='Bitcoin Price',
-        line=dict(color=COLORS["bitcoin"], width=2.5),
-        marker=dict(size=5, color=COLORS["bitcoin"], opacity=0.7),
-        fill='tozeroy',
-        fillcolor=f'rgba({242}, {169}, {0}, 0.1)'
+        mode='lines',
+        name='Price',
+        line=dict(color=COLORS["bitcoin"], width=3),
+        hovertemplate='Time: %{x}<br>Price: $%{y:.2f}<extra></extra>',
     ))
 
-    # Markers for min and max prices
+    # Highlight min and max
     fig.add_trace(go.Scatter(
-        x=[min_timestamp, max_timestamp],
-        y=[min_price, max_price],
-        mode='markers',
-        marker=dict(color=["red", "green"], size=10),
-        name='Min/Max Prices'
+        x=[min_timestamp],
+        y=[min_price],
+        mode='markers+text',
+        name='Min',
+        marker=dict(color='red', size=10),
+        text=[f"Min: ${min_price:.2f}"],
+        textposition="top right",
+        showlegend=False
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[max_timestamp],
+        y=[max_price],
+        mode='markers+text',
+        name='Max',
+        marker=dict(color='green', size=10),
+        text=[f"Max: ${max_price:.2f}"],
+        textposition="bottom left",
+        showlegend=False
     ))
 
     fig.update_layout(
-        title="Bitcoin Price Trend",
+        title="📈 Bitcoin Price Trend",
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
-        font=dict(family="Arial, sans-serif", color=COLORS["text"]),
+        font=dict(family="Arial", color=COLORS["text"]),
         xaxis=dict(
-            title="Time",
+            title="Date & Time",
             showgrid=True,
             gridcolor=COLORS["grid"],
-            tickangle=-45
+            tickangle=-45,
+            rangeslider=dict(visible=True),  # Slider for navigation
+            type="date"
         ),
         yaxis=dict(
             title="Price (USD)",
             showgrid=True,
             gridcolor=COLORS["grid"],
             tickprefix="$",
-            range=[lower_percentile * 0.99, upper_percentile * 1.01]  # Dynamic range
+            range=[lower_percentile * 0.98, upper_percentile * 1.02]
         ),
+        hovermode="x unified",
         margin=dict(l=50, r=50, t=50, b=50),
-        hovermode="x unified"
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
     )
 
     return fig
+
 
 
 def create_dashboard_layout():
