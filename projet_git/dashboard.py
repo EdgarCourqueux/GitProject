@@ -17,7 +17,7 @@ app = dash.Dash(
 server = app.server
 
 # Configuration Constants
-BASE_PATH = "/app"
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_PATH, "projet.csv")
 REPORT_FILE = os.path.join(BASE_PATH, "daily_report.csv")
 TZ_PARIS = pytz.timezone("Europe/Paris")
