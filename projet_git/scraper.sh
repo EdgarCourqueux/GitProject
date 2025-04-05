@@ -12,7 +12,7 @@ PRICE=$(curl -s "$URL" | grep -oP '(?<="usd":)[0-9.]+')
 
 # Vérifier si le prix est valide (éviter d'écrire une ligne vide)
 if [[ -z "$PRICE" || "$PRICE" == "null" ]]; then
-    echo "[$(date)] ❌ Erreur : Prix non récupéré !" >> "$LOG_FILE"
+    echo "[$(date)] Erreur : Prix non récupéré !" >> "$LOG_FILE"
     exit 1
 fi
 
@@ -23,5 +23,5 @@ echo "🔍 Contenu actuel de projet.csv :"
 cat "$DATA_FILE"
 
 # Afficher les données pour le débogage
-echo "[$TIMESTAMP] ✅ Prix récupéré : $PRICE"
-echo "[$TIMESTAMP] ✅ Prix enregistré : $PRICE" >> "$LOG_FILE"
+echo "[$TIMESTAMP] Prix récupéré : $PRICE"
+echo "[$TIMESTAMP] Prix enregistré : $PRICE" >> "$LOG_FILE"

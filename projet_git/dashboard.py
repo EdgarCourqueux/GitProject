@@ -165,7 +165,7 @@ def create_price_graph(df):
     ))
 
     fig.update_layout(
-        title="📈 Evolution du Prix du Bitcoin",
+        title="Evolution du Prix du Bitcoin",
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
         font=dict(family="Inter", color=COLORS["text"]),
