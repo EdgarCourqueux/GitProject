@@ -9,6 +9,10 @@ import datetime
 import pytz
 import os
 import scipy.stats as stats
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 # Application Initialization
 app = dash.Dash(
@@ -23,6 +27,7 @@ DATA_FILE = os.path.join(BASE_PATH, "projet.csv")
 REPORT_FILE = os.path.join(BASE_PATH, "daily_report.csv")
 TZ_PARIS = pytz.timezone("Europe/Paris")
 MAX_DATA_POINTS = 100
+PREDICTION_HOURS = 24  # Prédire 24 heures
 
 # Design Theme
 COLORS = {
@@ -31,6 +36,7 @@ COLORS = {
     "bitcoin": "#F7931A",
     "positive": "#2ecc71",
     "negative": "#e74c3c",
+    "prediction": "#9B59B6",  # Couleur pour les prédictions
     "card_bg": "#2C2C2E",
     "grid": "#3A3A3C"
 }
@@ -49,7 +55,7 @@ def load_data():
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
         df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
         df = df.dropna().sort_values("Timestamp")
-        return df.tail(MAX_DATA_POINTS)
+        return df
     except Exception as e:
         print(f"❌ Data loading error: {e}")
         return pd.DataFrame(columns=["Timestamp", "Price"])
@@ -77,6 +83,146 @@ def load_daily_report():
     except Exception as e:
         print(f"❌ Report loading error: {e}")
         return None
+
+def create_features(df):
+    """Créer des caractéristiques pour le modèle prédictif."""
+    df = df.copy()
+    
+    # Extraire des caractéristiques temporelles
+    df['hour'] = df['Timestamp'].dt.hour
+    df['dayofweek'] = df['Timestamp'].dt.dayofweek
+    df['quarter'] = df['Timestamp'].dt.quarter
+    df['month'] = df['Timestamp'].dt.month
+    df['year'] = df['Timestamp'].dt.year
+    df['dayofyear'] = df['Timestamp'].dt.dayofyear
+    df['dayofmonth'] = df['Timestamp'].dt.day
+    df['weekofyear'] = df['Timestamp'].dt.isocalendar().week
+    
+    # Créer des caractéristiques de lag (données historiques)
+    for lag in range(1, 25):  # Utiliser jusqu'à 24 heures de données historiques
+        df[f'lag_{lag}h'] = df['Price'].shift(lag)
+    
+    # Calculer les moyennes mobiles
+    df['rolling_mean_6h'] = df['Price'].rolling(window=6).mean()
+    df['rolling_mean_12h'] = df['Price'].rolling(window=12).mean()
+    df['rolling_mean_24h'] = df['Price'].rolling(window=24).mean()
+    
+    # Calculer la volatilité (écart-type sur une fenêtre)
+    df['volatility_24h'] = df['Price'].rolling(window=24).std()
+    
+    # Calculer les variations de prix relatives
+    df['price_change_1h'] = df['Price'].pct_change(periods=1)
+    df['price_change_12h'] = df['Price'].pct_change(periods=12)
+    df['price_change_24h'] = df['Price'].pct_change(periods=24)
+    
+    # Supprimer les lignes avec des valeurs NaN (dues aux lag et rolling windows)
+    df = df.dropna()
+    
+    return df
+
+def prepare_prediction_data(df):
+    """Préparer les données pour l'entraînement et les prédictions."""
+    if len(df) < 50:  # Nécessite un minimum de données
+        return None, None, None, None, None
+    
+    # Créer des features
+    df_features = create_features(df)
+    
+    # Variable cible: le prix 24h dans le futur
+    df_features['target'] = df_features['Price'].shift(-24)
+    
+    # Séparation des données récentes (pour la prédiction) et des données d'entraînement
+    df_recent = df_features.iloc[-1:].copy()  # Dernière ligne pour les prédictions futures
+    df_train = df_features.iloc[:-1].dropna().copy()  # Reste des données pour l'entraînement
+    
+    if df_train.empty:
+        return None, None, None, None, None
+    
+    # Séparer les features et la cible
+    features = ['hour', 'dayofweek', 'quarter', 'month', 'dayofyear', 'dayofmonth', 
+                'lag_1h', 'lag_12h', 'lag_24h', 
+                'rolling_mean_6h', 'rolling_mean_12h', 'rolling_mean_24h',
+                'volatility_24h', 'price_change_1h', 'price_change_12h', 'price_change_24h']
+    
+    # S'assurer que toutes les colonnes existent
+    features = [f for f in features if f in df_train.columns]
+    
+    X = df_train[features]
+    y = df_train['target']
+    
+    # Données récentes pour la prédiction
+    X_recent = df_recent[features]
+    
+    return X, y, X_recent, df_recent['Timestamp'].iloc[0], df_features
+
+def train_model_and_predict(df):
+    """Entraîner un modèle et faire des prédictions."""
+    if df.empty or len(df) < 50:
+        return None, None
+    
+    X, y, X_recent, last_timestamp, df_features = prepare_prediction_data(df)
+    
+    if X is None or y is None:
+        return None, None
+    
+    # Entraîner un modèle Random Forest
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X, y)
+    
+    # Pour les prédictions futures
+    future_timestamps = []
+    future_predictions = []
+    
+    # La dernière entrée connue
+    current_data = X_recent.iloc[0].copy()
+    current_timestamp = last_timestamp
+    
+    # Faire des prédictions pour les prochaines 24 heures
+    for i in range(PREDICTION_HOURS):
+        # Calculer le prochain timestamp (1 heure plus tard)
+        next_timestamp = current_timestamp + pd.Timedelta(hours=1)
+        
+        # Mettre à jour les caractéristiques temporelles
+        current_data['hour'] = next_timestamp.hour
+        current_data['dayofweek'] = next_timestamp.dayofweek
+        current_data['quarter'] = next_timestamp.quarter
+        current_data['month'] = next_timestamp.month
+        current_data['dayofyear'] = next_timestamp.dayofyear
+        current_data['dayofmonth'] = next_timestamp.day
+        
+        # Faire une prédiction
+        prediction = model.predict(current_data.values.reshape(1, -1))[0]
+        
+        # Stocker la prédiction
+        future_timestamps.append(next_timestamp)
+        future_predictions.append(prediction)
+        
+        # Mettre à jour pour la prochaine itération
+        # Dans un scénario réel, on mettrait à jour les lags, rolling means, etc.
+        # Mais pour simplifier, nous gardons les mêmes valeurs
+        current_timestamp = next_timestamp
+    
+    # Créer un DataFrame avec les prévisions
+    predictions_df = pd.DataFrame({
+        'Timestamp': future_timestamps,
+        'Predicted_Price': future_predictions
+    })
+    
+    # Calculer les métriques d'évaluation sur les données connues
+    # (utilisez une validation croisée dans un scénario réel)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    mae = mean_absolute_error(y_test, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    
+    eval_metrics = {
+        'MAE': mae,
+        'RMSE': rmse,
+        'Feature_Importance': dict(zip(X.columns, model.feature_importances_))
+    }
+    
+    return predictions_df, eval_metrics
 
 def calculate_volatility(df, window=14):
     """Calculate volatility as the standard deviation of daily returns."""
@@ -116,56 +262,70 @@ def calculate_var(df, confidence=0.95, window=14):
     var_pct = abs(var * 100)
     return var_pct
 
-def create_price_graph(df):
-    """Create a visually enhanced and interactive price graph."""
+def create_price_graph(df, predictions_df=None):
+    """Create a visually enhanced and interactive price graph with predictions."""
     if df.empty:
         return go.Figure()
 
-    lower_percentile = np.percentile(df["Price"], 5)
-    upper_percentile = np.percentile(df["Price"], 95)
+    # Limiter pour l'affichage
+    df_display = df.tail(MAX_DATA_POINTS).copy()
 
-    min_price = df["Price"].min()
-    max_price = df["Price"].max()
-    min_timestamp = df[df["Price"] == min_price]["Timestamp"].iloc[0]
-    max_timestamp = df[df["Price"] == max_price]["Timestamp"].iloc[0]
+    lower_percentile = np.percentile(df_display["Price"], 5)
+    upper_percentile = np.percentile(df_display["Price"], 95)
+
+    min_price = df_display["Price"].min()
+    max_price = df_display["Price"].max()
+    min_timestamp = df_display[df_display["Price"] == min_price]["Timestamp"].iloc[0]
+    max_timestamp = df_display[df_display["Price"] == max_price]["Timestamp"].iloc[0]
 
     fig = go.Figure()
 
     # Price line
     fig.add_trace(go.Scatter(
-        x=df["Timestamp"],
-        y=df["Price"],
+        x=df_display["Timestamp"],
+        y=df_display["Price"],
         mode='lines',
-        name='Prix',
+        name='Prix Actuel',
         line=dict(color=COLORS["bitcoin"], width=3),
         hovertemplate='Heure: %{x}<br>Prix: $%{y:.2f}<extra></extra>',
     ))
+
+    # Add predictions if available
+    if predictions_df is not None and not predictions_df.empty:
+        # Ajuster l'échelle y si nécessaire
+        all_prices = list(df_display["Price"]) + list(predictions_df["Predicted_Price"])
+        upper_percentile = max(upper_percentile, np.percentile(all_prices, 95))
+        
+        fig.add_trace(go.Scatter(
+            x=predictions_df["Timestamp"],
+            y=predictions_df["Predicted_Price"],
+            mode='lines',
+            name='Prédiction',
+            line=dict(color=COLORS["prediction"], width=2, dash='dash'),
+            hovertemplate='Prédiction pour: %{x}<br>Prix prévu: $%{y:.2f}<extra></extra>',
+        ))
 
     # Highlight min and max
     fig.add_trace(go.Scatter(
         x=[min_timestamp],
         y=[min_price],
-        mode='markers+text',
+        mode='markers',
         name='Min',
         marker=dict(color=COLORS["negative"], size=10),
-        text=[f"Min: ${min_price:.2f}"],
-        textposition="top right",
         showlegend=False
     ))
 
     fig.add_trace(go.Scatter(
         x=[max_timestamp],
         y=[max_price],
-        mode='markers+text',
+        mode='markers',
         name='Max',
         marker=dict(color=COLORS["positive"], size=10),
-        text=[f"Max: ${max_price:.2f}"],
-        textposition="bottom left",
         showlegend=False
     ))
 
     fig.update_layout(
-        title="📈 Evolution du Prix du Bitcoin",
+        title="📈 Evolution du Prix du Bitcoin avec Prédictions",
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
         font=dict(family="Inter", color=COLORS["text"]),
@@ -205,8 +365,10 @@ def create_volatility_graph(df, window=14):
     if len(df) < window:
         return go.Figure()
     
+    # Limiter pour l'affichage
+    df = df.tail(MAX_DATA_POINTS * 2).copy()  # Plus de données pour les calculs
+    
     # Calculate rolling volatility
-    df = df.copy()
     df['return'] = df['Price'].pct_change()
     df['volatility'] = df['return'].rolling(window=min(window, len(df))).std() * np.sqrt(365) * 100  # Annualized and in percentage
     
@@ -214,8 +376,8 @@ def create_volatility_graph(df, window=14):
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=df["Timestamp"],
-        y=df["volatility"],
+        x=df["Timestamp"].tail(MAX_DATA_POINTS),
+        y=df["volatility"].tail(MAX_DATA_POINTS),
         mode='lines',
         name='Volatilité',
         line=dict(color="#FF9500", width=2),
@@ -249,10 +411,10 @@ def create_volatility_graph(df, window=14):
     return fig
 
 def create_dashboard_layout():
-    """Create the dashboard layout."""
+    """Create the dashboard layout with prediction metrics."""
     return html.Div([
         html.Div([
-            html.H1("Bitcoin Live Monitor", className="dashboard-title"),
+            html.H1("Bitcoin Live Monitor & Prédiction", className="dashboard-title"),
             html.Div(id="current-price", className="current-price")
         ], className="dashboard-header"),
         
@@ -271,6 +433,11 @@ def create_dashboard_layout():
             
             html.Div([
                 html.Div(id="risk-metrics", className="report-container")
+            ], className="report-card"),
+            
+            # Section pour les métriques de prédiction
+            html.Div([
+                html.Div(id="prediction-metrics", className="report-container")
             ], className="report-card")
         ], className="content-wrapper")
     ], className="dashboard-container")
@@ -281,7 +448,8 @@ def create_dashboard_layout():
      Output("volatility-graph", "figure"),
      Output("current-price", "children"),
      Output("daily-report", "children"),
-     Output("risk-metrics", "children")],
+     Output("risk-metrics", "children"),
+     Output("prediction-metrics", "children")],
     [Input("interval-component", "n_intervals")]
 )
 def update_dashboard(n):
@@ -294,29 +462,36 @@ def update_dashboard(n):
     except Exception as e:
         print(f"❌ Script execution error: {e}")
     
-    # Load data for graph
-    df = load_data()
+    # Load all data for predictions
+    df_full = load_data()
     
-    if df.empty:
+    if df_full.empty:
         empty_fig = go.Figure()
         empty_fig.update_layout(
             plot_bgcolor=COLORS["background"],
             paper_bgcolor=COLORS["background"]
         )
-        return empty_fig, empty_fig, "N/A", html.Div("No data available"), html.Div("No data available")
+        empty_prediction_metrics = html.Div("No prediction data available")
+        return empty_fig, empty_fig, "N/A", html.Div("No data available"), html.Div("No data available"), empty_prediction_metrics
     
-    # Create price graph
-    price_fig = create_price_graph(df)
+    # Data for display
+    df_display = df_full.tail(MAX_DATA_POINTS).copy()
+    
+    # Train model and generate predictions
+    predictions_df, eval_metrics = train_model_and_predict(df_full)
+    
+    # Create price graph with predictions
+    price_fig = create_price_graph(df_display, predictions_df)
     
     # Create volatility graph
-    volatility_fig = create_volatility_graph(df)
+    volatility_fig = create_volatility_graph(df_full)
     
-    current_price = f"${df['Price'].iloc[-1]:,.2f}"
+    current_price = f"${df_display['Price'].iloc[-1]:,.2f}"
     
     # Calculate risk metrics
-    volatility = calculate_volatility(df)
-    var_95 = calculate_var(df, confidence=0.95)
-    var_99 = calculate_var(df, confidence=0.99)
+    volatility = calculate_volatility(df_display)
+    var_95 = calculate_var(df_display, confidence=0.95)
+    var_99 = calculate_var(df_display, confidence=0.99)
     
     # Load daily report
     report = load_daily_report()
@@ -392,7 +567,67 @@ def update_dashboard(n):
         ], className="risk-grid")
     ], className="report-container")
     
-    return price_fig, volatility_fig, current_price, daily_report_html, risk_metrics_html
+    # Créer la section des métriques de prédiction
+    if predictions_df is not None and eval_metrics is not None:
+        # Calculer la prédiction pour la prochaine journée
+        next_day_prediction = predictions_df['Predicted_Price'].iloc[-1] if not predictions_df.empty else 0
+        current_price_value = df_display['Price'].iloc[-1]
+        price_change = (next_day_prediction - current_price_value) / current_price_value * 100
+        
+        prediction_metrics_html = html.Div([
+            html.H3("Prévisions & Métriques du Modèle", className="report-title"),
+            html.Div([
+                html.Div([
+                    html.Div([
+                        html.Span("Prédiction à 24h", className="risk-label"),
+                        html.Div([
+                            html.Span(f"${next_day_prediction:.2f}", className="risk-value"),
+                        ], className="risk-value-container")
+                    ], className="risk-header"),
+                    html.Div(f"Variation prévue: {price_change:.2f}%", 
+                             className="risk-description",
+                             style={"color": COLORS["positive"] if price_change >= 0 else COLORS["negative"]})
+                ], className="risk-item"),
+                
+                html.Div([
+                    html.Div([
+                        html.Span("Précision du Modèle (MAE)", className="risk-label"),
+                        html.Div([
+                            html.Span(f"${eval_metrics['MAE']:.2f}", className="risk-value"),
+                        ], className="risk-value-container")
+                    ], className="risk-header"),
+                    html.Div("Erreur absolue moyenne des prédictions", className="risk-description")
+                ], className="risk-item"),
+                
+                html.Div([
+                    html.Div([
+                        html.Span("Précision du Modèle (RMSE)", className="risk-label"),
+                        html.Div([
+                            html.Span(f"${eval_metrics['RMSE']:.2f}", className="risk-value"),
+                        ], className="risk-value-container")
+                    ], className="risk-header"),
+                    html.Div("Erreur quadratique moyenne des prédictions", className="risk-description")
+                ], className="risk-item"),
+                
+                html.Div([
+                    html.Div([
+                        html.Span("Facteur le Plus Influent", className="risk-label"),
+                        html.Div([
+                            html.Span(max(eval_metrics['Feature_Importance'].items(), key=lambda x: x[1])[0], className="risk-value"),
+                        ], className="risk-value-container")
+                    ], className="risk-header"),
+                    html.Div("Variable ayant le plus d'impact sur les prédictions", className="risk-description")
+                ], className="risk-item")
+            ], className="risk-grid")
+        ], className="report-container")
+    else:
+        prediction_metrics_html = html.Div([
+            html.H3("Prévisions", className="report-title"),
+            html.Div("Données insuffisantes pour générer des prédictions fiables.", 
+                     style={"padding": "20px", "text-align": "center", "color": "#B0B0B0"})
+        ], className="report-container")
+    
+    return price_fig, volatility_fig, current_price, daily_report_html, risk_metrics_html, prediction_metrics_html
 
 # Application Layout
 app.layout = html.Div([
@@ -406,7 +641,7 @@ app.index_string = """
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Bitcoin Live Dashboard</title>
+        <title>Bitcoin Live Dashboard & Prédiction</title>
         {%metas%}
         {%favicon%}
         {%css%}
