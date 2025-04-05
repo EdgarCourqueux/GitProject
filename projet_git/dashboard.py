@@ -167,8 +167,9 @@ def update_dashboard(n):
     """Comprehensive dashboard update function."""
     try:
         # Run scraper and daily report scripts
-        subprocess.run(["/bin/bash", "/app/scraper.sh"], check=True)
-        subprocess.run(["/bin/bash", "/app/daily_report.sh"], check=True)
+        subprocess.run(["/bin/bash", os.path.join(BASE_PATH, "scraper.sh")], check=True)
+        subprocess.run(["/bin/bash", os.path.join(BASE_PATH, "daily_report.sh")], check=True)
+
     except Exception as e:
         print(f"❌ Script execution error: {e}")
     
