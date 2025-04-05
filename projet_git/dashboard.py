@@ -1,3 +1,4 @@
+
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -8,6 +9,7 @@ import subprocess
 import datetime
 import pytz
 import os
+import scipy.stats as stats
 
 # Application Initialization
 app = dash.Dash(
@@ -25,13 +27,13 @@ MAX_DATA_POINTS = 100
 
 # Design Theme
 COLORS = {
-    "background": "#f4f6f9",
-    "text": "#2c3e50",
-    "bitcoin": "#f2a900",
+    "background": "#1C1C1E",
+    "text": "#FFFFFF",
+    "bitcoin": "#F7931A",
     "positive": "#2ecc71",
     "negative": "#e74c3c",
-    "card_bg": "#ffffff",
-    "grid": "#ecf0f1"
+    "card_bg": "#2C2C2E",
+    "grid": "#3A3A3C"
 }
 
 def ensure_files_exist():
@@ -77,6 +79,44 @@ def load_daily_report():
         print(f"❌ Report loading error: {e}")
         return None
 
+def calculate_volatility(df, window=14):
+    """Calculate volatility as the standard deviation of daily returns."""
+    if len(df) < 2:
+        return 0
+    
+    # Calculate returns
+    df = df.copy()
+    df['return'] = df['Price'].pct_change()
+    
+    # Calculate rolling volatility (annualized)
+    volatility = df['return'].rolling(window=min(window, len(df))).std()
+    
+    # Annualize (assuming daily data)
+    annualized_vol = volatility.iloc[-1] * np.sqrt(365) if not volatility.empty else 0
+    return annualized_vol
+
+def calculate_var(df, confidence=0.95, window=14):
+    """Calculate Value at Risk using historical method."""
+    if len(df) < window:
+        return 0
+    
+    # Calculate returns
+    df = df.copy()
+    df['return'] = df['Price'].pct_change()
+    
+    # Filter out NaN values
+    returns = df['return'].dropna()
+    
+    if len(returns) < 2:
+        return 0
+    
+    # Calculate VaR
+    var = np.percentile(returns, 100 * (1 - confidence))
+    
+    # Convert to percentage and make it positive for display
+    var_pct = abs(var * 100)
+    return var_pct
+
 def create_price_graph(df):
     """Create a visually enhanced and interactive price graph."""
     if df.empty:
@@ -97,9 +137,9 @@ def create_price_graph(df):
         x=df["Timestamp"],
         y=df["Price"],
         mode='lines',
-        name='Price',
+        name='Prix',
         line=dict(color=COLORS["bitcoin"], width=3),
-        hovertemplate='Time: %{x}<br>Price: $%{y:.2f}<extra></extra>',
+        hovertemplate='Heure: %{x}<br>Prix: $%{y:.2f}<extra></extra>',
     ))
 
     # Highlight min and max
@@ -108,7 +148,7 @@ def create_price_graph(df):
         y=[min_price],
         mode='markers+text',
         name='Min',
-        marker=dict(color='red', size=10),
+        marker=dict(color=COLORS["negative"], size=10),
         text=[f"Min: ${min_price:.2f}"],
         textposition="top right",
         showlegend=False
@@ -119,40 +159,95 @@ def create_price_graph(df):
         y=[max_price],
         mode='markers+text',
         name='Max',
-        marker=dict(color='green', size=10),
+        marker=dict(color=COLORS["positive"], size=10),
         text=[f"Max: ${max_price:.2f}"],
         textposition="bottom left",
         showlegend=False
     ))
 
     fig.update_layout(
-        title="📈 Bitcoin Price Trend",
+        title="📈 Evolution du Prix du Bitcoin",
         plot_bgcolor=COLORS["background"],
         paper_bgcolor=COLORS["background"],
-        font=dict(family="Arial", color=COLORS["text"]),
+        font=dict(family="Inter", color=COLORS["text"]),
         xaxis=dict(
-            title="Date & Time",
+            title="Date & Heure",
             showgrid=True,
             gridcolor=COLORS["grid"],
             tickangle=-45,
             rangeslider=dict(visible=True),  # Slider for navigation
-            type="date"
+            type="date",
+            tickfont=dict(color=COLORS["text"])
         ),
         yaxis=dict(
-            title="Price (USD)",
+            title="Prix (USD)",
             showgrid=True,
             gridcolor=COLORS["grid"],
             tickprefix="$",
-            range=[lower_percentile * 0.98, upper_percentile * 1.02]
+            range=[lower_percentile * 0.98, upper_percentile * 1.02],
+            tickfont=dict(color=COLORS["text"])
         ),
         hovermode="x unified",
         margin=dict(l=50, r=50, t=50, b=50),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(color=COLORS["text"])
+        )
     )
 
     return fig
 
-
+def create_volatility_graph(df, window=14):
+    """Create a volatility graph based on price data."""
+    if len(df) < window:
+        return go.Figure()
+    
+    # Calculate rolling volatility
+    df = df.copy()
+    df['return'] = df['Price'].pct_change()
+    df['volatility'] = df['return'].rolling(window=min(window, len(df))).std() * np.sqrt(365) * 100  # Annualized and in percentage
+    
+    # Create the figure
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=df["Timestamp"],
+        y=df["volatility"],
+        mode='lines',
+        name='Volatilité',
+        line=dict(color="#FF9500", width=2),
+        hovertemplate='Date: %{x}<br>Volatilité: %{y:.2f}%<extra></extra>',
+    ))
+    
+    fig.update_layout(
+        title="📊 Volatilité du Bitcoin (annualisée)",
+        plot_bgcolor=COLORS["background"],
+        paper_bgcolor=COLORS["background"],
+        font=dict(family="Inter", color=COLORS["text"]),
+        xaxis=dict(
+            title="Date & Heure",
+            showgrid=True,
+            gridcolor=COLORS["grid"],
+            tickangle=-45,
+            type="date",
+            tickfont=dict(color=COLORS["text"])
+        ),
+        yaxis=dict(
+            title="Volatilité (%)",
+            showgrid=True,
+            gridcolor=COLORS["grid"],
+            ticksuffix="%",
+            tickfont=dict(color=COLORS["text"])
+        ),
+        hovermode="x unified",
+        margin=dict(l=50, r=50, t=50, b=50)
+    )
+    
+    return fig
 
 def create_dashboard_layout():
     """Create the dashboard layout."""
@@ -168,16 +263,26 @@ def create_dashboard_layout():
             ], className="graph-container"),
             
             html.Div([
+                dcc.Graph(id="volatility-graph", config={'displayModeBar': False})
+            ], className="graph-container"),
+            
+            html.Div([
                 html.Div(id="daily-report", className="report-container")
-            ])
+            ], className="report-card"),
+            
+            html.Div([
+                html.Div(id="risk-metrics", className="report-container")
+            ], className="report-card")
         ], className="content-wrapper")
     ], className="dashboard-container")
 
 # Single callback to update all components
 @app.callback(
     [Output("price-graph", "figure"),
+     Output("volatility-graph", "figure"),
      Output("current-price", "children"),
-     Output("daily-report", "children")],
+     Output("daily-report", "children"),
+     Output("risk-metrics", "children")],
     [Input("interval-component", "n_intervals")]
 )
 def update_dashboard(n):
@@ -194,11 +299,25 @@ def update_dashboard(n):
     df = load_data()
     
     if df.empty:
-        return go.Figure(), "N/A", html.Div("No data available")
+        empty_fig = go.Figure()
+        empty_fig.update_layout(
+            plot_bgcolor=COLORS["background"],
+            paper_bgcolor=COLORS["background"]
+        )
+        return empty_fig, empty_fig, "N/A", html.Div("No data available"), html.Div("No data available")
     
     # Create price graph
-    fig = create_price_graph(df)
+    price_fig = create_price_graph(df)
+    
+    # Create volatility graph
+    volatility_fig = create_volatility_graph(df)
+    
     current_price = f"${df['Price'].iloc[-1]:,.2f}"
+    
+    # Calculate risk metrics
+    volatility = calculate_volatility(df)
+    var_95 = calculate_var(df, confidence=0.95)
+    var_99 = calculate_var(df, confidence=0.99)
     
     # Load daily report
     report = load_daily_report()
@@ -207,18 +326,18 @@ def update_dashboard(n):
         daily_report_html = html.Div("No report available")
     else:
         daily_report_html = html.Div([
-            html.H3("Daily Bitcoin Report", className="report-title"),
+            html.H3("Rapport Quotidien Bitcoin", className="report-title"),
             html.Div([
                 html.Div([
-                    html.Span("Timestamp", className="report-label"),
+                    html.Span("Horodatage", className="report-label"),
                     html.Span(report["Timestamp"].strftime("%Y-%m-%d %H:%M:%S"), className="report-value")
                 ], className="report-item"),
                 html.Div([
-                    html.Span("Open Price", className="report-label"),
+                    html.Span("Prix d'ouverture", className="report-label"),
                     html.Span(f"${report['Open']:,.2f}", className="report-value")
                 ], className="report-item"),
                 html.Div([
-                    html.Span("Close Price", className="report-label"),
+                    html.Span("Prix de clôture", className="report-label"),
                     html.Span(f"${report['Close']:,.2f}", className="report-value")
                 ], className="report-item"),
                 html.Div([
@@ -238,7 +357,29 @@ def update_dashboard(n):
             ], className="report-grid")
         ], className="report-container")
     
-    return fig, current_price, daily_report_html
+    # Create risk metrics card
+    risk_metrics_html = html.Div([
+        html.H3("Métriques de Risque", className="report-title"),
+        html.Div([
+            html.Div([
+                html.Span("Volatilité (annualisée)", className="report-label"),
+                html.Span(f"{volatility * 100:.2f}%", className="report-value"),
+                html.Div("Mesure de la variance des prix sur la période", className="metric-description")
+            ], className="report-item"),
+            html.Div([
+                html.Span("VaR 95%", className="report-label"),
+                html.Span(f"{var_95:.2f}%", className="report-value"),
+                html.Div("Perte maximale sur une journée avec 95% de confiance", className="metric-description")
+            ], className="report-item"),
+            html.Div([
+                html.Span("VaR 99%", className="report-label"),
+                html.Span(f"{var_99:.2f}%", className="report-value"),
+                html.Div("Perte maximale sur une journée avec 99% de confiance", className="metric-description")
+            ], className="report-item")
+        ], className="report-grid")
+    ], className="report-container")
+    
+    return price_fig, volatility_fig, current_price, daily_report_html, risk_metrics_html
 
 # Application Layout
 app.layout = html.Div([
@@ -257,6 +398,8 @@ app.index_string = """
         {%favicon%}
         {%css%}
         <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+            
             body {
                 font-family: 'Inter', sans-serif;
                 margin: 0;
@@ -265,21 +408,27 @@ app.index_string = """
                 color: #FFFFFF;
                 line-height: 1.6;
             }
+            
             .dashboard-container {
                 max-width: 100%; 
                 width: 100%;      
                 margin: 0 auto;   
                 padding: 20px;    
                 box-sizing: border-box; 
-                overflow: hidden; /* Empêche le débordement horizontal */
+                overflow: hidden;
             }
+            
+            .dashboard-header {
+                margin-bottom: 30px;
+            }
+            
             .content-wrapper {
-                display: flex;
-                flex-direction: row; /* Assure que les éléments sont en ligne sur grands écrans */
-                flex-wrap: wrap; /* Permet aux éléments de passer à la ligne sur petits écrans */
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                 gap: 20px;
-                justify-content: center; /* Centre les éléments dans le conteneur */
+                justify-content: center;
             }
+            
             .dashboard-title {
                 color: #F7931A;
                 font-size: 32px;
@@ -287,6 +436,7 @@ app.index_string = """
                 margin-bottom: 20px;
                 text-align: center;
             }
+            
             .current-price {
                 text-align: center;
                 font-size: 48px;
@@ -294,49 +444,86 @@ app.index_string = """
                 color: #F7931A;
                 margin-bottom: 30px;
             }
-            .content-wrapper {
-                display: flex;
-                gap: 30px;
+            
+            .graph-container {
+                background-color: #2C2C2E;
+                border-radius: 12px;
+                padding: 15px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                margin-bottom: 20px;
             }
-            .graph-container, .report-container {
-                flex: 1 1 100%; /* Permet à chaque conteneur de prendre toute la largeur sur petits écrans */
-                max-width: 60%; /* Utilisez jusqu'à 48% de l'espace disponible sur grands écrans */
-                min-width: 300px; /* Assure une largeur minimale pour la lisibilité */
-                padding: 15px; /* Ajustez le padding pour réduire l'espace interne */
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            
+            .report-card {
+                background-color: #2C2C2E;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                margin-bottom: 20px;
             }
+            
             .report-title {
                 color: #F7931A;
-                font-size: 24px;
+                font-size: 22px;
                 margin-bottom: 20px;
                 border-bottom: 2px solid #F7931A;
                 padding-bottom: 10px;
             }
+            
             .report-grid {
                 display: grid;
                 gap: 15px;
             }
+            
             .report-item {
                 display: flex;
-                justify-content: space-between;
-                padding: 10px;
-                background-color: #1C1C1E;
+                flex-direction: column;
+                padding: 15px;
+                background-color: #3A3A3C;
                 border-radius: 8px;
             }
+            
             .report-label {
                 color: #B0B0B0;
                 font-size: 14px;
+                margin-bottom: 5px;
             }
+            
             .report-value {
                 color: #FFFFFF;
                 font-weight: 600;
-            }   
+                font-size: 18px;
+            }
+            
+            .metric-description {
+                color: #8E8E93;
+                font-size: 12px;
+                margin-top: 5px;
+                font-style: italic;
+            }
+            
+            @media (min-width: 992px) {
+                .content-wrapper {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                
+                .graph-container:nth-child(1),
+                .graph-container:nth-child(2) {
+                    grid-column: span 2;
+                }
+            }
+            
             @media (max-width: 768px) {
                 .content-wrapper {
-                    flex-direction: column; /* Empile les conteneurs verticalement sur petits écrans */
+                    grid-template-columns: 1fr;
                 }
-                .graph-container, .report-container {
-                    max-width: 100%; /* Prend toute la largeur disponible sur petits écrans */
+                
+                .graph-container,
+                .report-card {
+                    grid-column: span 1;
+                }
+                
+                .current-price {
+                    font-size: 36px;
                 }
             }
         </style>
