@@ -1,45 +1,49 @@
 #!/bin/bash
-# Définir les chemins absolus pour le conteneur
-DATA_FILE="/app/projet.csv"
-REPORT_FILE="/app/daily_report.csv"
-LOG_FILE="/app/cron_debug.log"
+
+# Définir les chemins absolus basés sur l'emplacement du script
+BASE_DIR="$(dirname "$0")"
+DATA_FILE="$BASE_DIR/projet.csv"
+REPORT_FILE="$BASE_DIR/daily_report.csv"
+LOG_FILE="$BASE_DIR/cron_debug.log"
+
+echo "📊 [$(date)] Script daily_report.sh lancé" | tee -a "$LOG_FILE"
 
 # Créer les fichiers s'ils n'existent pas
 touch "$DATA_FILE" "$REPORT_FILE" "$LOG_FILE"
 
-# Obtenir la date et l'heure actuelles de manière précise
+# Obtenir la date actuelle
+TODAY=$(date "+%Y-%m-%d")
 CURRENT_TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
-# Filtrer les données du jour
-TODAY=$(date "+%Y-%m-%d")
-grep "$TODAY" "$DATA_FILE" > temp_data.csv
+# Extraire les lignes du jour
+grep "$TODAY" "$DATA_FILE" > "$BASE_DIR/temp_data.csv"
 
-# Vérifier si on a des données valides
-if [[ ! -s temp_data.csv ]]; then
-    echo "[$(date)] ❌ Aucune donnée pour aujourd'hui !" >> "$LOG_FILE"
-    rm temp_data.csv
+# Vérification de données disponibles
+if [[ ! -s "$BASE_DIR/temp_data.csv" ]]; then
+    echo "❌ [$(date)] Aucune donnée pour aujourd'hui ($TODAY) !" | tee -a "$LOG_FILE"
+    rm "$BASE_DIR/temp_data.csv"
     exit 1
 fi
 
-# Extraire les prix avec des valeurs par défaut
-OPEN=$(head -n 1 temp_data.csv | cut -d',' -f2)
-CLOSE=$(tail -n 1 temp_data.csv | cut -d',' -f2)
-MAX=$(cut -d',' -f2 temp_data.csv | sort -nr | head -n1)
-MIN=$(cut -d',' -f2 temp_data.csv | sort -n | head -n1)
+# Extraction des valeurs
+OPEN=$(head -n 1 "$BASE_DIR/temp_data.csv" | cut -d',' -f2)
+CLOSE=$(tail -n 1 "$BASE_DIR/temp_data.csv" | cut -d',' -f2)
+MAX=$(cut -d',' -f2 "$BASE_DIR/temp_data.csv" | sort -nr | head -n1)
+MIN=$(cut -d',' -f2 "$BASE_DIR/temp_data.csv" | sort -n | head -n1)
 
-# Calcul de la variation en pourcentage
-EVOLUTION=$(awk "BEGIN {print (($CLOSE - $OPEN) / $OPEN) * 100}")
+# Calcul de l'évolution
+EVOLUTION=$(awk "BEGIN {printf \"%.2f\", (($CLOSE - $OPEN) / $OPEN) * 100}")
 
-# Vérifier si les calculs sont valides
+# Validation des valeurs
 if [[ -z "$OPEN" || -z "$CLOSE" || -z "$MAX" || -z "$MIN" ]]; then
-    echo "[$(date)] ❌ Calculs invalides !" >> "$LOG_FILE"
-    rm temp_data.csv
+    echo "❌ [$(date)] Erreur : données manquantes pour le calcul" | tee -a "$LOG_FILE"
+    rm "$BASE_DIR/temp_data.csv"
     exit 1
 fi
 
-# Écrire dans le fichier rapport avec un timestamp précis
+# Écriture dans le rapport
 echo "$CURRENT_TIMESTAMP,$OPEN,$CLOSE,$MAX,$MIN,${EVOLUTION}%" > "$REPORT_FILE"
-echo "[$(date)] ✅ Rapport généré : $CURRENT_TIMESTAMP" >> "$LOG_FILE"
+echo "✅ [$(date)] Rapport généré avec succès." | tee -a "$LOG_FILE"
 
 # Nettoyage
-rm temp_data.csv
+rm "$BASE_DIR/temp_data.csv"
