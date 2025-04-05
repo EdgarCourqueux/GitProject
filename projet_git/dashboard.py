@@ -270,9 +270,11 @@ def create_price_graph(df, predictions_df=None):
     # Limiter pour l'affichage
     df_display = df.tail(MAX_DATA_POINTS).copy()
 
+    # Calculer les percentiles pour l'échelle y
     lower_percentile = np.percentile(df_display["Price"], 5)
     upper_percentile = np.percentile(df_display["Price"], 95)
 
+    # Trouver les points min et max pour les mettre en évidence
     min_price = df_display["Price"].min()
     max_price = df_display["Price"].max()
     min_timestamp = df_display[df_display["Price"] == min_price]["Timestamp"].iloc[0]
@@ -280,7 +282,7 @@ def create_price_graph(df, predictions_df=None):
 
     fig = go.Figure()
 
-    # Price line
+    # Ligne de prix actuelle
     fig.add_trace(go.Scatter(
         x=df_display["Timestamp"],
         y=df_display["Price"],
@@ -290,12 +292,13 @@ def create_price_graph(df, predictions_df=None):
         hovertemplate='Heure: %{x}<br>Prix: $%{y:.2f}<extra></extra>',
     ))
 
-    # Add predictions if available
+    # Ajouter les prédictions si disponibles
     if predictions_df is not None and not predictions_df.empty:
         # Ajuster l'échelle y si nécessaire
         all_prices = list(df_display["Price"]) + list(predictions_df["Predicted_Price"])
         upper_percentile = max(upper_percentile, np.percentile(all_prices, 95))
         
+        # Ajouter la ligne de prédiction en pointillés
         fig.add_trace(go.Scatter(
             x=predictions_df["Timestamp"],
             y=predictions_df["Predicted_Price"],
@@ -303,6 +306,21 @@ def create_price_graph(df, predictions_df=None):
             name='Prédiction',
             line=dict(color=COLORS["prediction"], width=2, dash='dash'),
             hovertemplate='Prédiction pour: %{x}<br>Prix prévu: $%{y:.2f}<extra></extra>',
+        ))
+        
+        # Connecter le dernier point réel au premier point prédit pour une transition fluide
+        last_real_time = df_display["Timestamp"].iloc[-1]
+        last_real_price = df_display["Price"].iloc[-1]
+        first_pred_time = predictions_df["Timestamp"].iloc[0]
+        first_pred_price = predictions_df["Predicted_Price"].iloc[0]
+        
+        fig.add_trace(go.Scatter(
+            x=[last_real_time, first_pred_time],
+            y=[last_real_price, first_pred_price],
+            mode='lines',
+            line=dict(color=COLORS["prediction"], width=1, dash='dot'),
+            showlegend=False,
+            hoverinfo='none'
         ))
 
     # Highlight min and max
@@ -439,7 +457,10 @@ def create_dashboard_layout():
             html.Div([
                 html.Div(id="prediction-metrics", className="report-container")
             ], className="report-card")
-        ], className="content-wrapper")
+        ], className="content-wrapper"),
+        
+        # Interval component pour mettre à jour les données
+        dcc.Interval(id="interval-component", interval=60000)  # Mise à jour toutes les 60 secondes
     ], className="dashboard-container")
 
 # Single callback to update all components
@@ -568,9 +589,9 @@ def update_dashboard(n):
     ], className="report-container")
     
     # Créer la section des métriques de prédiction
-    if predictions_df is not None and eval_metrics is not None:
+    if predictions_df is not None and eval_metrics is not None and not predictions_df.empty:
         # Calculer la prédiction pour la prochaine journée
-        next_day_prediction = predictions_df['Predicted_Price'].iloc[-1] if not predictions_df.empty else 0
+        next_day_prediction = predictions_df['Predicted_Price'].iloc[-1]
         current_price_value = df_display['Price'].iloc[-1]
         price_change = (next_day_prediction - current_price_value) / current_price_value * 100
         
@@ -630,12 +651,7 @@ def update_dashboard(n):
     return price_fig, volatility_fig, current_price, daily_report_html, risk_metrics_html, prediction_metrics_html
 
 # Application Layout
-app.layout = html.Div([
-    create_dashboard_layout(),
-    dcc.Interval(id="interval-component", interval=60000)  # Update every 60 seconds
-])
-
-
+app.layout = create_dashboard_layout()
 # Custom Index String with Dark Mode Styling
 app.index_string = """
 <!DOCTYPE html>
